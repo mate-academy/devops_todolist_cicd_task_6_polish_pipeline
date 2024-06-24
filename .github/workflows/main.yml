@@ -130,7 +130,6 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
-
   deploy-helm-staging:
     name: Deploy helm staging
     uses: ./.github/workflows/reusable-deployment.yml
