@@ -67,6 +67,13 @@ jobs:
         with:
           name: python-artifacts-${{ matrix.python-version }}-${{ matrix.os }}
           path: .
+
+      - name: Upload kind cluster artifact
+        if: github.ref_name == 'main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-cluster
+          path: ${{ github.workspace }}/cluster.yml
   
   docker-ci:
     name: Build and Push Image
@@ -91,7 +98,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         push: true
-        context: .
+        context: ./src
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
@@ -133,7 +140,6 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
-
   deploy-helm-staging:
     name: Deploy helm staging
     uses: ./.github/workflows/reusable-deployment.yml
