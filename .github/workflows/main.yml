@@ -7,32 +7,45 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Choose which artifact to deploy'
+        required: true
+        default: 'ubuntu-3.8'
+        type: string
 env:
   PythonVersion: 3.8
   DockerImageName: todoapp
+  
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-ci:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu, windows]
     defaults:
       run:
         working-directory: ./src
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PythonVersion }}
-        uses: actions/setup-python@v4
+  
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
         with:
-          python-version: ${{ env.PythonVersion }}
-
+          python-version: ${{ matrix.python-version }}
+    
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install coverage flake8
-          pip install -r requirements.txt
-
+          pip install -r requirements.txt    
       - name: Run tests
         run: |
           python manage.py test
@@ -41,35 +54,18 @@ jobs:
         run: |
           coverage run --source='.' manage.py test
           coverage report
-
       - name: Linting
         run: |
           flake8 . --show-source --statistics --exit-zero
-
       - name: Check Complexity
         run: |
           flake8 . --exit-zero --max-complexity=6
-
       - name: Upload python artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.os }}
           path: .
-
-      - name: Upload helm artifacts
-        if: github.ref_name == 'main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: helm-artifacts
-          path: ${{ github.workspace }}/helm-charts
-
-      - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: kind-cluster
-          path: ${{ github.workspace }}/cluster.yml
-
+  
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
@@ -134,3 +130,14 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+
+  deploy-helm-staging:
+    name: Deploy helm Staging
+    uses: ./.github/workflows/reusable-deployment.yml
+    needs: deploy-helm
+    secrets: inherit
+    with:
+      environment: staging
+      version: ${{ github.sha }}
+      helm-values-path: "./helm-charts/todoapp/values/stg.yaml"
+      helm-release-name: todoapp-staging
