@@ -76,7 +76,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{matrix.python-version}}-${{ matrix.os }}
         path: .
 
     - name: Login to Docker Hub
@@ -101,7 +101,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts
+        name: python-artifacts-${{matrix.python-version}}-${{ matrix.os }}
         path: .
 
     - name: Set Up Helm
@@ -130,6 +130,7 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+
   deploy-helm-staging:
     name: Deploy helm staging
     uses: ./.github/workflows/reusable-deployment.yml
