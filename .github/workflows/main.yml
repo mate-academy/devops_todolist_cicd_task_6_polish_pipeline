@@ -63,7 +63,7 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts-${{ matrix.os }}
+          name: python-artifacts-${{matrix.python-version}}-${{ matrix.os }}
           path: .
   
   docker-ci:
@@ -130,9 +130,8 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
-
   deploy-helm-staging:
-    name: Deploy helm Staging
+    name: Deploy helm staging
     uses: ./.github/workflows/reusable-deployment.yml
     needs: deploy-helm
     secrets: inherit
