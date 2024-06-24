@@ -71,6 +71,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu, windows]
     steps:
 
     - uses: actions/download-artifact@v4
@@ -97,6 +101,10 @@ jobs:
     needs: python-ci
     if: github.ref_name == 'main'
     name: Helm CI
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu, windows]
     steps:
 
     - uses: actions/download-artifact@v4
