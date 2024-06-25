@@ -21,7 +21,7 @@ todoapp:
   secrets:
     SECRET_KEY: placeholder
     DB_NAME: placeholder
-    DB_USER: aplaceholder
+    DB_USER: placeholder
     DB_PASSWORD: placeholder
     DB_HOST: placeholder
 
