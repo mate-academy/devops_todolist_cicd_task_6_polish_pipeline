@@ -30,17 +30,17 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package-${{ github.run_id }}
+          name: helm-package
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-${{ github.run_id }}
+          name: helm-artifacts
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster-${{ github.run_id }}
+          name: kind-cluster
           path: .
 
       - name: Set Up Helm

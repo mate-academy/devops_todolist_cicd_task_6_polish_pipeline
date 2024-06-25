@@ -55,21 +55,21 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts-${{ github.run_id }}
+          name: python-artifacts
           path: .
 
       - name: Upload helm artifacts
         if: ${{ github.ref_name == 'main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts-${{ github.run_id }}
+          name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: ${{ github.ref_name == 'main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster-${{ github.run_id }}
+          name: kind-cluster
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/download-artifact@v4
         name: Download python artifacts
         with:
-          name: python-artifacts-${{ github.run_id }}
+          name: python-artifacts
           path: .
 
       - name: Login to Docker Hub
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-${{ github.run_id }}
+          name: helm-artifacts
           path: .
 
       - name: Set Up Helm
@@ -123,7 +123,7 @@ jobs:
       - name: Upload Helm Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: helm-package-${{ github.run_id }}
+          name: helm-package
           path: ./*.tgz
 
   deploy-helm:
