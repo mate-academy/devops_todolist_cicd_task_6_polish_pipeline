@@ -1,3 +1,6 @@
+mysql:
+  namespace: mysql-staging
+
 todoapp:
   namespace: todoapp
   image:
