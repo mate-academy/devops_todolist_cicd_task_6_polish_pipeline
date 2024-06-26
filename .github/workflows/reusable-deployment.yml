@@ -30,17 +30,17 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: helm-package-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - name: Set Up Helm

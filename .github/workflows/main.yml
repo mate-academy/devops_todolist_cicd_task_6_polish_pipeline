@@ -14,12 +14,12 @@ env:
 
 jobs:
   python-ci:
-    # strategy:
-    #   matrix:
-    #     PythonVersion: [3.8, 3.9]
-    #     OsType: [ubuntu-latest, windows-latest]
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -27,10 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -55,21 +55,21 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
         if: ${{ github.ref_name == 'main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: ${{ github.ref_name == 'main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/download-artifact@v4
         name: Download python artifacts
         with:
-          name: python-artifacts
+          name: python-artifacts-ubuntu-latest-3.8
           path: .
 
       - name: Login to Docker Hub
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-ubuntu-latest-3.8
           path: .
 
       - name: Set Up Helm
