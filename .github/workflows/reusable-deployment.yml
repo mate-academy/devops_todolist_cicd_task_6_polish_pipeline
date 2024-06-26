@@ -28,17 +28,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: List available artifacts
+        run: ls ${{ github.workspace }}
+
+      - name: Download helm package artifact
+        uses: actions/download-artifact@v4
         with:
           name: helm-package-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
-      - uses: actions/download-artifact@v4
+      - name: Download helm artifacts
+        uses: actions/download-artifact@v4
         with:
           name: helm-artifacts-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
-      - uses: actions/download-artifact@v4
+      - name: Download kind cluster artifact
+        uses: actions/download-artifact@v4
         with:
           name: kind-cluster-${{ inputs.environment }}-${{ inputs.version }}
           path: .

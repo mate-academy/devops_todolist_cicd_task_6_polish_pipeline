@@ -150,6 +150,8 @@ jobs:
         with:
           name: helm-package-ubuntu-latest-3.8
           path: ./*.tgz
+      - name: List available artifacts after upload
+        run: ls ${{ github.workspace }}
 
   deploy-helm:
     name: Deploy helm
