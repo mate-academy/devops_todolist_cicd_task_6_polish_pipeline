@@ -14,12 +14,12 @@ env:
 
 jobs:
   python-ci:
-    strategy:
-      matrix:
-        PythonVersion: [3.8, 3.9]
-        OsType: [ubuntu-latest, windows-latest]
+    # strategy:
+    #   matrix:
+    #     PythonVersion: [3.8, 3.9]
+    #     OsType: [ubuntu-latest, windows-latest]
 
-    runs-on: ${{ matrix.OsType }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./src
@@ -27,10 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.PythonVersion }}
+      - name: Set up Python ${{ env.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.PythonVersion }}
+          python-version: ${{ env.PythonVersion }}
 
       - name: Install dependencies
         run: |
