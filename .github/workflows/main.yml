@@ -159,12 +159,6 @@ jobs:
     name: Deploy helm
     runs-on: ubuntu-latest
     needs: [helm-ci, docker-ci]
-    secrets: inherit
     steps:
-      - name: Manual Approval
-        uses: fredrikskoglund/action-approval@v1
-        with:
-          ENVIRONMENT: STG
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Deploy Helm
-        run: echo "Deploying Helm to STG environment"
+      - name: Notify for Manual Approval
+        run: echo "Please trigger the Helm Deploy workflow manually with the appropriate inputs to proceed with the deployment."
