@@ -37,14 +37,15 @@ jobs:
           name: helm-package-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
-      - name: Download helm artifacts
-        uses: actions/download-artifact@v4
+      - name: List downloaded artifacts
+        run: ls ${{ github.workspace }}
+
+      - uses: actions/download-artifact@v4
         with:
           name: helm-artifacts-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
-      - name: Download kind cluster artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: kind-cluster-${{ inputs.environment }}-${{ inputs.version }}
           path: .
