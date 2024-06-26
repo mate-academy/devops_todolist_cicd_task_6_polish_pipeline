@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DockerImageName: todoapp
 
@@ -153,9 +157,14 @@ jobs:
 
   deploy-helm:
     name: Deploy helm
-    uses: ./.github/workflows/reusable-deployment.yml
+    runs-on: ubuntu-latest
     needs: [helm-ci, docker-ci]
     secrets: inherit
-    with:
-      environment: development
-      version: ${{ github.sha }}
+    steps:
+      - name: Manual Approval
+        uses: fredrikskoglund/action-approval@v1
+        with:
+          ENVIRONMENT: STG
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy Helm
+        run: echo "Deploying Helm to STG environment"
