@@ -163,12 +163,12 @@ jobs:
       - name: Upload Helm Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: helm-package-ubuntu-latest-3.8
+          name: helm-package-${{ github.sha }}
           path: ./*.tgz
 
   deploy-helm-dev:
     name: Deploy Helm
-    uses: ./.github/workflows/reusable-deployment.yml
+    uses: ./.github/workflows/helm-upgrade.yml
     needs: [ helm-ci, docker-ci ]
     secrets: inherit
     with:
@@ -177,7 +177,7 @@ jobs:
 
   deploy-helm-staging:
     name: Deploy Helm
-    uses: ./.github/workflows/reusable-deployment.yml
+    uses: ./.github/workflows/helm-upgrade.yml
     needs: deploy-helm-dev
     secrets: inherit
     with:
