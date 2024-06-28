@@ -17,26 +17,39 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-helm:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
-      - uses: actions/download-artifact@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: List available artifacts
+        run: ls ${{ github.workspace }}
+
+      - name: Download helm package artifact
+        uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: helm-package-${{ inputs.version }}
           path: .
 
-      - uses: actions/download-artifact@v4
+      - name: List downloaded artifacts
+        run: ls ${{ github.workspace }}
+
+      - name: Download additional artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.version }}
           path: .
 
-      - uses: actions/download-artifact@v4
+      - name: Download kind cluster artifact
+        uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ inputs.version }}
           path: .
 
       - name: Set Up Helm
@@ -62,7 +75,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
 
       - name: Deploy helm to Development
         run: |
@@ -76,5 +89,4 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          --set todoapp.image.tag=${{ inputs.version }}
