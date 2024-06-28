@@ -20,7 +20,7 @@ on:
 
 jobs:
   deploy-helm:
-    name: ${{ inputs.environment }}
+    name: Deploy to ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
 
@@ -34,7 +34,7 @@ jobs:
       - name: Download helm package artifact
         uses: actions/download-artifact@v4
         with:
-          name: helm-package-${{ inputs.version }}
+          name: helm-package-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - name: List downloaded artifacts
@@ -43,13 +43,13 @@ jobs:
       - name: Download additional artifacts
         uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-${{ inputs.version }}
+          name: helm-artifacts-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - name: Download kind cluster artifact
         uses: actions/download-artifact@v4
         with:
-          name: kind-cluster-${{ inputs.version }}
+          name: kind-cluster-${{ inputs.environment }}-${{ inputs.version }}
           path: .
 
       - name: Set Up Helm
@@ -75,9 +75,9 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ inputs.version }}
+          --set todoapp.image.tag=${{ github.sha }}
 
-      - name: Deploy helm to Development
+      - name: Deploy helm to ${{ inputs.environment }}
         run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
@@ -89,4 +89,4 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ inputs.version }}
+          --set todoapp.image.tag=${{ github.sha }}
