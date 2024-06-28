@@ -167,8 +167,8 @@ jobs:
           path: ./*.tgz
 
   deploy-helm-dev:
-    name: Deploy Helm
-    uses: ./.github/workflows/helm-upgrade.yml
+    name: deploy-helm-dev
+    uses: ./.github/workflows/reusable-deployment.yml
     needs: [ helm-ci, docker-ci ]
     secrets: inherit
     with:
@@ -176,8 +176,8 @@ jobs:
       version: ${{ github.sha }}
 
   deploy-helm-staging:
-    name: Deploy Helm
-    uses: ./.github/workflows/helm-upgrade.yml
+    name: deploy-helm-stg
+    uses: ./.github/workflows/reusable-deployment.yml
     needs: deploy-helm-dev
     secrets: inherit
     with:
