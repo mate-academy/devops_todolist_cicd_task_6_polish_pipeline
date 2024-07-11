@@ -13,7 +13,7 @@ env:
 
 jobs:
   python-ci:
-    strategi:
+    strategy:
       matrix:
         PythonVersion: [3.8, 3.9]
         OsType: [ubuntu-latest, windows-latest]
