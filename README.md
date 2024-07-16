@@ -40,7 +40,7 @@ This CI/CD enhancement involves several key tasks:
 3. Use Matrix to run unit tests on different Python versions (3.8, 3.9).
 4. Use Matrix to run unit tests on different OS types: Ubuntu and Windows.
 5. Add input variables:
-    a. Input variable to choose which artifact from the matrix to deploy. (windows-3.8, ubuntu-3.9, etc).
+    a. Input variable to choose which artifact from the matrix to deploy. (windows-3.8, ubuntu-3.9, etc).tr
 6. Add branch protection to the main branch in your fork.
 7. Add mandatory pull requests and Python CI job status checks for PRs.
 8. Add Manual Approval for the STG environment.
@@ -48,3 +48,6 @@ This CI/CD enhancement involves several key tasks:
 10. New runs should cancel the previous runs.
 11. Create a Pull Request with the changes.
 12. Pull Requests description should also contain a reference to a workflow run with successful workflow execution.
+    
+
+
