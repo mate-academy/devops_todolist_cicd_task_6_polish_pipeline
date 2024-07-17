@@ -7,6 +7,19 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Select the artifact to deploy'
+        required: true
+        default: 'ubuntu-latest-3.9'
+        type: choice
+        options:
+          - windows-latest-3.8
+          - windows-latest-3.9
+          - ubuntu-latest-3.8
+          - ubuntu-latest-3.9
+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
