@@ -35,18 +35,20 @@ jobs:
         PythonVersion: [3.8, 3.9]
         OsType: [ubuntu-latest, windows-latest]
         include:
-          - environment: python-artifacts-3.8-ubuntu-latest
-            PythonVersion: 3.8
-            OsType: ubuntu-latest
-          - environment: python-artifacts-3.9-ubuntu-latest
-            PythonVersion: 3.9
-            OsType: ubuntu-latest
-          - environment: python-artifacts-3.8-windows-latest
-            PythonVersion: 3.8
-            OsType: windows-latest
-          - environment: python-artifacts-3.9-windows-latest
-            PythonVersion: 3.9
-            OsType: windows-latest
+          #- environment: python-artifacts-3.8-ubuntu-latest
+          #  PythonVersion: 3.8
+          #  OsType: ubuntu-latest
+          - environment: python-artifacts-${{ github.event.inputs.artifact }}
+            artifact: ${{ github.event.inputs.artifact }}
+          #- environment: python-artifacts-3.9-ubuntu-latest
+          #  PythonVersion: 3.9
+          #  OsType: ubuntu-latest
+          #- environment: python-artifacts-3.8-windows-latest
+          #  PythonVersion: 3.8
+          #  OsType: windows-latest
+          #- environment: python-artifacts-3.9-windows-latest
+          #  PythonVersion: 3.9
+          #  OsType: windows-latest
     runs-on: ${{ matrix.OsType }}
     defaults:
       run:
