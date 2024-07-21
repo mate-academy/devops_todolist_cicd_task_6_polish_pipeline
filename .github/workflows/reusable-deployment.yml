@@ -12,9 +12,11 @@ on:
         required: true
         type: string
       helm-values-path:
+        required: false
         type: string
         default: './todoapp/values.yaml'
       helm-release-name:
+        required: false
         default: todoapp
         type: string
 jobs:
