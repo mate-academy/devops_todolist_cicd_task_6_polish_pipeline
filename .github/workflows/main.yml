@@ -27,15 +27,12 @@ env:
   DockerImageName: todoapp
 
 jobs:
-  build:
+  python-ci:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: [3.8, 3.9]
-
-  python-ci:
-    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -43,10 +40,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -145,7 +142,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: helm-package
-        path: ./*.tgz
+        path: ./*.tgzruns-on: ${{ matrix.OsType }}
 
   deploy-helm-dev:
     name: Deploy helm to Development
