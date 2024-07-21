@@ -7,14 +7,35 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      os-version:
+        description: 'OS Version (e.g. ubuntu-latest, windows-latest)'
+        required: true
+        default: 'ubuntu-latest'
+      python-version:
+        description: 'Python Version (e.g. 3.8, 3.9)'
+        required: true
+        default: '3.8'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true  
 
 env:
   PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: [3.8, 3.9]
+
   python-ci:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
