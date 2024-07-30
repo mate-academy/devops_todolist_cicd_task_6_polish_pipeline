@@ -9,14 +9,38 @@ on:
     branches: ["main"]
   workflow_dispatch:
     inputs:
-      os-version:
-        description: 'OS Version (e.g. ubuntu-latest, windows-latest)'
-        required: true
-        default: 'ubuntu-latest'
       python-version:
-        description: 'Python Version (e.g. 3.8, 3.9)'
+        description: 'Python version to use'
         required: true
         default: '3.8'
+        options:
+          - 3.8
+          - 3.9
+      os:
+        description: 'Operating system'
+        required: true
+        default: 'ubuntu-latest'
+        options:
+          - ubuntu-latest
+          - windows-latest
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'development'
+        options:
+          - development
+          - staging
+
+#  workflow_dispatch:
+#    inputs:
+#      os-version:
+#        description: 'OS Version (e.g. ubuntu-latest, windows-latest)'
+#        required: true
+#        default: 'ubuntu-latest'
+#      python-version:
+#        description: 'Python Version (e.g. 3.8, 3.9)'
+#        required: true
+#        default: '3.8'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -163,3 +187,18 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
+  approval:
+    if: github.event.inputs.environment == 'staging'
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for manual approval
+        uses: tibdex/github-app-token@v1
+        id: approval
+        with:
+          app_id: ${{ secrets.GITHUB_APP_ID }}
+          private_key: ${{ secrets.GITHUB_PRIVATE_KEY }}
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment"
+          # Add deployment script here
