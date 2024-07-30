@@ -125,8 +125,8 @@ jobs:
 
   helm-ci:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: python-ci
-    if: github.ref_name == 'main'
     name: Helm CI
     steps:
       - uses: actions/download-artifact@v4
