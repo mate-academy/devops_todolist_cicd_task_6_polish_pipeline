@@ -187,18 +187,3 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
-  approval:
-    if: github.event.inputs.environment == 'staging'
-    needs: build_and_push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for manual approval
-        uses: tibdex/github-app-token@v1
-        id: approval
-        with:
-          app_id: ${{ secrets.GITHUB_APP_ID }}
-          private_key: ${{ secrets.GITHUB_PRIVATE_KEY }}
-      - name: Deploy to staging
-        run: |
-          echo "Deploying to staging environment"
-          # Add deployment script here
