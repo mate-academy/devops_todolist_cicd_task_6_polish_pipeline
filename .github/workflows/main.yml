@@ -2,19 +2,38 @@ name: python-deployment
 
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-
+  workflow_dispatch:
+    inputs:
+      OsType:
+        description: 'Run on ...'
+        required: true
+        type: choice
+        options: [ubuntu-latest, windows-latest]
+      PythonVersion:
+        description: 'Using Python v. ...'
+        required: true
+        type: choice
+        options: [3.8, 3.9]
 env:
-  PythonVersion: 3.8
+  # PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +41,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
