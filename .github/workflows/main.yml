@@ -33,7 +33,7 @@ jobs:
       matrix:
         PythonVersion: [3.8, 3.9]
         OsType: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.OsType }}
+    runs-on: ${{ github.event.inputs.OsType || matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -41,10 +41,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.PythonVersion }}
+      - name: Set up Python ${{ github.event.inputs.PythonVersion || matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.PythonVersion }}
+          python-version: ${{ github.event.inputs.PythonVersion || matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -72,26 +72,26 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.PythonVersion }}]
+          name: python-artifacts-[OS.${{ github.event.inputs.OsType || matrix.OsType }}]-[python-v.${{ github.event.inputs.PythonVersion || matrix.PythonVersion }}]
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.PythonVersion }}]
+          name: helm-artifacts-[OS.${{ github.event.inputs.OsType || matrix.OsType }}]-[python-v.${{ github.event.inputs.PythonVersion || matrix.PythonVersion }}]
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.PythonVersion }}]
+          name: kind-cluster-[OS.${{ github.event.inputs.OsType || matrix.OsType }}]-[python-v.${{ github.event.inputs.PythonVersion || matrix.PythonVersion }}]
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
     name: Build and Push Image
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.OsType || 'ubuntu-latest' }}
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
     steps:
@@ -99,7 +99,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
+        name: python-artifacts-[OS.${{ github.event.inputs.OsType || 'ubuntu-latest' }}]-[python-v.${{ github.event.inputs.PythonVersion || 3.8 }}]
         path: .
 
     - name: Login to Docker Hub
@@ -116,7 +116,7 @@ jobs:
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.inputs.OsType || 'ubuntu-latest' }}
     needs: python-ci
     if: github.ref_name == 'main'
     name: Helm CI
@@ -124,7 +124,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
+        name: helm-artifacts-[OS.${{ github.event.inputs.OsType || 'ubuntu-latest' }}]-[python-v.${{ github.event.inputs.PythonVersion || 3.8 }}]
         path: .
 
     - name: Set Up Helm
@@ -153,6 +153,9 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+      OsType: ${{ github.event.inputs.OsType || 'ubuntu-latest' }}
+      PythonVersion: ${{ github.event.inputs.PythonVersion || 3.8 }}
+
 
   deploy-helm-stg:
     name: Deploy helm to Staging
@@ -162,5 +165,7 @@ jobs:
     with:
       environment: staging
       version: ${{ github.sha }}
+      OsType: ${{ github.event.inputs.OsType || 'ubuntu-latest' }}
+      PythonVersion: ${{ github.event.inputs.PythonVersion || 3.8 }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging

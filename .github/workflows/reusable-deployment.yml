@@ -11,6 +11,12 @@ on:
       version:
         required: true
         type: string
+      OsType:
+        required: true
+        type: string
+      PythonVersion:
+        required: true
+        type: number
       helm-values-path:
         type: string
         default: './todoapp/values.yaml'
@@ -20,7 +26,7 @@ on:
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
+      runs-on: ${{ inputs.OsType }}
       environment: ${{ inputs.environment }}
 
       steps:
@@ -31,12 +37,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
+          name: helm-artifacts-[OS.${{ inputs.OsType }}]-[python-v.${{ inputs.PythonVersion }}]
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster-[OS.ubuntu-latest]-[python-v.3.8]
+          name: kind-cluster-[OS.${{ inputs.OsType }}]-[python-v.${{ inputs.PythonVersion }}]
           path: .
 
       - name: Set Up Helm
@@ -79,4 +85,3 @@ jobs:
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag="${{ github.sha }}" \
           --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/todoapp
-
