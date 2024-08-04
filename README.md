@@ -53,3 +53,41 @@ This CI/CD enhancement involves several key tasks:
 workflow execution.
 15. Provide screenshots confirming that branch protection and status checks are working as expected.
 16. Provide a screenshot confirming `staging` deployment requires manual approval.
+
+
+---
+
+### SOLUTION
+
+The one commit "complex workflow solution" present on dev branch is the result of numerous experiments conducted on deleted forked repository.
+The repository had to be deleted due to the current technical restrictions on Mate Academy platform causing inability to continue work on forked repository in numerous cases connected with branch / pull request interactions.
+
+The Solution implements running full workflow on both `push` and `workflow-dispatch` using appropriate chosen / default values
+while complete successfull runs are only possible with `ubuntu-latest` OsType settings
+
+---
+
+Dozens of tests led to the folowing conclusions:
+
+1. `docker-ci` job can not be successful being run-on windows since
+
+    windows runner sequence eventually would require `docker/setup-buildx-action@v3`
+    running which would lead to the error:
+
+    ```json
+    Error: buildx failed with: ERROR: Error response from daemon: Windows does not support privileged mode
+    ```
+
+    ---
+
+    Therefore in order to let the workflow go as more further as possible OsType was manually set to `ubuntu-latest`
+2. `deploy` job would fail while run-on the `windows-latest`, while steps are implemented to postpone fail:
+
+    1. First fail cause was fixed - kind cluster install process requires using `wget` which I conditionally installed if run-on windows
+    2. Second fail cause I could not find how to fix:
+
+        the kind binary file is linux oriented therefore can not be installed on Windows:
+
+        ```
+        D:/a/_actions/helm/kind-action/v1/kind.sh: line 85: C:\hostedtoolcache\windows/kind/v0.23.0/amd64/kind/bin//kind: cannot execute binary file: Exec format error
+        ```
