@@ -57,11 +57,11 @@ jobs:
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
@@ -71,10 +71,25 @@ jobs:
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
 
+# dev
+# SECRET_KEY: zdfsadfsadfsfs
+# DB_NAME: app_db
+# DB_USER: app_user
+# DB_PASSWORD: 1234
+# DB_HOST: mysql-0.mysql.mysql.svc.cluster.local
+# mysql:
+#   secrets:
+#     MYSQL_ROOT_PASSWORD: 12345
+#     MYSQL_USER: app_user
+#     MYSQL_PASSWORD: 1234
+
+# -staging
+
+# DB_HOST: mysql-0.mysql.mysql-staging.svc.cluster.local
