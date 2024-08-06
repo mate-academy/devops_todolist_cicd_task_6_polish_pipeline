@@ -15,10 +15,10 @@ on:
         default: 'ubuntu-latest-3.8'
         type: choice
         options:
-        - ubuntu-3.8
-        - ubuntu-3.9
-        - windows-3.8
-        - windows-3.9
+        - ubuntu-latest-3.8
+        - ubuntu-latest-3.9
+        - windows-latest-3.8
+        - windows-latest-3.9
 
 concurrency:
  group: ${{ github.workflow }}-${{ github.ref }}
@@ -97,7 +97,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-3.8' }}
+        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
         path: .
 
     - name: Login to Docker Hub
@@ -121,7 +121,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-3.8' }}
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
         path: .
 
     - name: Set Up Helm
