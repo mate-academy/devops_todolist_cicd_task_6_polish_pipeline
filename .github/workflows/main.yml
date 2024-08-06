@@ -23,6 +23,10 @@ on:
       python-version:
         description: 'Python version to use'
         required: true
+        type: choice
+        options:
+          - 3.8
+          - 3.9
         #default: '3.8'
         #options:
         #  - 3.8
