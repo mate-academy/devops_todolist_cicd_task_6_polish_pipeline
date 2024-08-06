@@ -81,7 +81,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-ubuntu-latest-3.8
+        name: python-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
         path: .
 
     - name: Login to Docker Hub
@@ -105,7 +105,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-ubuntu-latest-3.8
+        name: helm-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
         path: .
 
     - name: Set Up Helm
