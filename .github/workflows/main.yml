@@ -93,7 +93,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-3.8' }}
         path: .
 
     - name: Login to Docker Hub
@@ -117,7 +117,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-3.8' }}
         path: .
 
     - name: Set Up Helm
