@@ -60,7 +60,7 @@ jobs:
 
       - name: Dry Run Helm
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
+          helm install --dry-run --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
