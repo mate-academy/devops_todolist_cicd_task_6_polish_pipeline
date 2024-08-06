@@ -12,7 +12,7 @@ on:
     branches: ["main"]
   workflow_dispatch:
     inputs:
-      osType:
+      OsType:
         description: 'Operating system'
         required: true
         type: choice
@@ -48,8 +48,8 @@ jobs:
     strategy:
       matrix:
         python-version: [3.8, 3.9]
-        osType: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.osType }}
+        OsType: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -85,28 +85,28 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
+          name: python-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.python-version }}]
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
+          name: helm-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.python-version }}]
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
+          name: kind-cluster-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.python-version }}]
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
     env:
-      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
     if: ${{ github.ref_name == 'main' }} #github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: python-ci
@@ -114,7 +114,7 @@ jobs:
       - uses: actions/download-artifact@v4
         name: Download python artifacts
         with:
-          name: python-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
+          name: python-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.python-version }}]
           path: .
 
       - name: Login to Docker Hub
@@ -132,10 +132,10 @@ jobs:
 
   helm-ci:
     name: Helm CI
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }} #ubuntu-latest
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }} #ubuntu-latest
     #if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     env:
-      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
     needs: python-ci
     if: github.ref_name == 'main'
@@ -143,7 +143,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-[OS.${{ env.osType }}]-[python-v.${{ env.python-version }}]
+          name: helm-artifacts-[OS.${{ env.OsType }}]-[python-v.${{ env.python-version }}]
           path: .
 
       - name: Set Up Helm
@@ -172,7 +172,7 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
-      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
 
   deploy-helm-stg:
@@ -183,7 +183,7 @@ jobs:
     with:
       environment: staging
       version: ${{ github.sha }}
-      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
