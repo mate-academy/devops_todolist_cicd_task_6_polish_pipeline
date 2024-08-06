@@ -71,18 +71,21 @@ jobs:
           flake8 . --exit-zero --max-complexity=6
 
       - name: Upload python artifacts
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
@@ -91,13 +94,14 @@ jobs:
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
     needs: python-ci
     steps:
 
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
+        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }} #${{ matrix.OsType }}-${{ matrix.PythonVersion }}
         path: .
 
     - name: Login to Docker Hub
@@ -115,13 +119,14 @@ jobs:
 
   helm-ci:
     runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
     needs: python-ci
     name: Helm CI
     steps:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }} #${{ matrix.OsType }}-${{ matrix.PythonVersion }}
         path: .
 
     - name: Set Up Helm
