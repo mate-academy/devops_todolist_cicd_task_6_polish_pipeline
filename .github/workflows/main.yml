@@ -173,7 +173,7 @@ jobs:
       environment: development
       version: ${{ github.sha }}
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
-      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
+      PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
 
   deploy-helm-stg:
     name: Deploy helm to Staging
@@ -184,6 +184,6 @@ jobs:
       environment: staging
       version: ${{ github.sha }}
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
-      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
+      PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
