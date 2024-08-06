@@ -12,7 +12,7 @@ on:
       artifact_choice:
         description: 'Choose artifact to deploy'
         required: true
-        default: 'ubuntu-3.8'
+        default: 'ubuntu-latest-3.8'
         type: choice
         options:
         - ubuntu-3.8
