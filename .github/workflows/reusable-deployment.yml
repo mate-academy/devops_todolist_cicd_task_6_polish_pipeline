@@ -31,12 +31,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-[OS.ubuntu-latest]-[python-v.3.8]
+          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster-[OS.ubuntu-latest]-[python-v.3.8]
+          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Set Up Helm
