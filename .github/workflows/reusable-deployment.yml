@@ -39,12 +39,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-[OS.${{ inputs.OsType }}]-[python-v.${{ inputs.PythonVersion }}]
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-[OS.${{ inputs.OsType }}]-[python-v.${{ inputs.PythonVersion }}]
           path: .
 
       - name: Set Up Helm
@@ -71,6 +71,7 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/todoapp
 
       - name: Deploy helm to Development
         run: |
@@ -85,4 +86,5 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/todoapp
 
