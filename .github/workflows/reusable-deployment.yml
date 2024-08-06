@@ -11,6 +11,12 @@ on:
       version:
         required: true
         type: string
+      OsType:
+        required: true
+        type: string
+      PythonVersion:
+        required: true
+        type: string
       helm-values-path:
         required: false
         type: string
@@ -22,7 +28,7 @@ on:
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
+      runs-on: ${{ inputs.OsType }}
       environment: ${{ inputs.environment }}
 
       steps:
