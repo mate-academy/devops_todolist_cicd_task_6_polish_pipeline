@@ -16,9 +16,7 @@ on:
         description: 'Operating system'
         required: true
         type: choice
-        options:
-          - ubuntu-latest
-          - windows-latest 
+        options: [ubuntu-latest, windows-latest] 
         #default: 'ubuntu-latest'
         #options:
         #  - ubuntu-latest
@@ -27,9 +25,7 @@ on:
         description: 'Python version to use'
         required: true
         type: choice
-        options:
-          - 3.8
-          - 3.9
+        options: [3.8, 3.9]
         #default: '3.8'
         #options:
         #  - 3.8
@@ -49,11 +45,11 @@ env:
 
 jobs:
   python-ci:
-    runs-on: ${{ matrix.osType }}
     strategy:
       matrix:
-        osType: [ubuntu-latest, windows-latest]
         python-version: [3.8, 3.9]
+        osType: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.osType }}
     defaults:
       run:
         working-directory: ./src
@@ -89,33 +85,36 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts-${{ matrix.osType }}-${{ matrix.python-version }}
+          name: python-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts-${{ matrix.osType }}-${{ matrix.python-version }}
+          name: helm-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    env:
+      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
+    if: ${{ github.ref_name == 'main' }} #github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: python-ci
     steps:
       - uses: actions/download-artifact@v4
         name: Download python artifacts
         with:
-          name: python-artifacts-ubuntu-latest-3.8
+          name: python-artifacts-[OS.${{ matrix.osType }}]-[python-v.${{ matrix.python-version }}]
           path: .
 
       - name: Login to Docker Hub
@@ -132,14 +131,19 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    needs: python-ci
     name: Helm CI
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }} #ubuntu-latest
+    #if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    env:
+      osType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.osType || 'ubuntu-latest' }}
+      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.python-version || '3.8' }}
+    needs: python-ci
+    if: github.ref_name == 'main'
+
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-ubuntu-latest-3.8
+          name: helm-artifacts-[OS.${{ env.osType }}]-[python-v.${{ env.python-version }}]
           path: .
 
       - name: Set Up Helm
