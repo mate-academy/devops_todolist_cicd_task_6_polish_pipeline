@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
-      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
+      PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
     if: ${{ github.ref_name == 'main' }} #github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: python-ci
     steps:
@@ -136,7 +136,7 @@ jobs:
     #if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     env:
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
-      python-version: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
+      PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
     needs: python-ci
     if: github.ref_name == 'main'
 
