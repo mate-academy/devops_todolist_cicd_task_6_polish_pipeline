@@ -4,7 +4,7 @@ run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -101,7 +101,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }} #${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: python-artifacts-${{ github.event.inputs.artifact_choice }}
         path: .
 
     - name: Login to Docker Hub
@@ -126,7 +126,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }} #${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice }}
         path: .
 
     - name: Set Up Helm
@@ -155,6 +155,8 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+      artifact_choice: ${{ github.event.inputs.artifact_choice }}
+
 
   deploy-helm-stg:
     name: Deploy helm to Staging
@@ -166,3 +168,4 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
+      artifact_choice: ${{ github.event.inputs.artifact_choice }}
