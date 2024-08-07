@@ -85,5 +85,5 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ github.sha }} \
           --set todoapp.image.repository=alexhf92/todoapp
