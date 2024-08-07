@@ -25,10 +25,7 @@ on:
         required: false
         default: todoapp
         type: string
-      artifact_choice:
-        default: 'ubuntu-latest-3.8'
-        type: string
-        required: true
+
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
