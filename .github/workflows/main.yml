@@ -8,7 +8,7 @@ concurrency:
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -76,14 +76,14 @@ jobs:
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        # if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.PythonVersion }}]
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        # if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster-[OS.${{ matrix.OsType }}]-[python-v.${{ matrix.PythonVersion }}]
@@ -95,7 +95,7 @@ jobs:
     env:
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
-    if: ${{ github.ref_name == 'main' }}
+    # if: ${{ github.ref_name == 'main' }}
     needs: python-ci
 
     steps:
@@ -125,7 +125,7 @@ jobs:
       OsType: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.OsType || 'ubuntu-latest' }}
       PythonVersion: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PythonVersion || '3.8' }}
     needs: python-ci
-    if: github.ref_name == 'main'
+    # if: github.ref_name == 'main'
     steps:
 
     - uses: actions/download-artifact@v4
