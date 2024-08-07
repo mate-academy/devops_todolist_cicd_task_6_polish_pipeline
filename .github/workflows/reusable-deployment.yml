@@ -88,9 +88,11 @@ jobs:
           --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }} \
           --set todoapp.image.repository=alexhf92/todoapp \
-          kubectl get pods -n mysql \
-          kubectl get statefulsets -n mysql \
-          kubectl get pods -n todoapp \
-          kubectl get deployments -n todoapp \
-          kubectl get events -n mysql \
-          kubectl get events -n todoapp 
+      - name: Check Resources
+        run: |
+          kubectl get pods -n mysql
+          kubectl get statefulsets -n mysql
+          kubectl get pods -n todoapp
+          kubectl get deployments -n todoapp
+          kubectl get events -n mysql
+          kubectl get events -n todoapp
