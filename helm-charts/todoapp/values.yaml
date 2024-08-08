@@ -1,8 +1,8 @@
 mysql:
   secrets:
-    MYSQL_ROOT_PASSWORD: placeholder
-    MYSQL_USER: placeholder
-    MYSQL_PASSWORD: placeholder
+    MYSQL_ROOT_PASSWORD: placeholde
+    MYSQL_USER: placeholde
+    MYSQL_PASSWORD: placeholde
 
 todoapp:
   namespace: todoapp
@@ -19,11 +19,11 @@ todoapp:
       cpu: "150m"
 
   secrets:
-    SECRET_KEY: placeholder
-    DB_NAME: placeholder
-    DB_USER: placeholder
-    DB_PASSWORD: placeholder
-    DB_HOST: placeholder
+    SECRET_KEY: placeholde
+    DB_NAME: placeholde
+    DB_USER: placeholde
+    DB_PASSWORD: placeholde
+    DB_HOST: placeholde
 
   hpa:
     minReplicas: 2

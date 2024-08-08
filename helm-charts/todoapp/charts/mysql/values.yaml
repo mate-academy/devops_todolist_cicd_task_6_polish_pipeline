@@ -7,9 +7,9 @@ image:
 port: 3306
 
 secrets:
-  MYSQL_ROOT_PASSWORD: placeholder
-  MYSQL_USER: placeholder
-  MYSQL_PASSWORD: placeholder
+  MYSQL_ROOT_PASSWORD: placeholde
+  MYSQL_USER: placeholde
+  MYSQL_PASSWORD: placeholde
 
 resources:
   requests:
