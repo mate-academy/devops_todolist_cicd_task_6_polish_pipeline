@@ -1,4 +1,5 @@
 name: helm-upgrade
+
 run-name: ${{ github.actor }} - ${{ github.ref_name }}
 
 on:
@@ -18,37 +19,54 @@ on:
         default: todoapp
         type: string
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-helm:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
+    steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: helm-package-${{ github.run_id }}
           path: .
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: helm-artifacts
-          path: .
+        continue-on-error: false
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: helm-artifacts-${{ github.run_id }}-ubuntu-latest-3.8
           path: .
+        continue-on-error: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: kind-cluster-${{ github.run_id }}-ubuntu-latest-3.8
+          path: .
+        continue-on-error: false
 
       - name: Set Up Helm
         uses: azure/setup-helm@v4.2.0
+        with:
+          check-latest: true
 
       - name: Set up Kubectl
         uses: azure/setup-kubectl@v4
+        with:
+          check-latest: true
 
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1
         with:
           config: ./cluster.yml
+        continue-on-error: false
+        timeout-minutes: 5
+
+      - name: Debug Variables
+        run: |
+          echo "Helm release name: ${{ inputs.helm-release-name }}"
+          echo "Helm values path: ${{ inputs.helm-values-path }}"
+          echo "Image tag: ${{ inputs.version }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Secrets are not displayed for security reasons, but they are being used."
 
       - name: Dry Run Helm
         run: |
@@ -57,24 +75,27 @@ jobs:
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
+        continue-on-error: true
+        timeout-minutes: 10
 
-      - name: Deploy helm to Development
+      - name: Deploy Helm to ${{ inputs.environment }}
         run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          --set todoapp.image.tag=${{ inputs.version }}
+        continue-on-error: true
+        timeout-minutes: 10

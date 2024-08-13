@@ -1,20 +1,42 @@
 name: python-deployment
 
-run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
+run-name: ${{ github.actor }} - ${{ github.ref_name }} - ${{ github.sha }}
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: 'Python version to use'
+        required: true
+        default: '3.8'
+      os-type:
+        description: 'Operating System to use'
+        required: true
+        default: 'ubuntu-latest'
+      helm-release-name:
+        description: 'Helm release name'
+        required: true
+        default: 'todoapp-dev'
+      helm-values-path:
+        description: 'Path to Helm values file'
+        required: true
+        default: './todoapp/values/dev.yaml'
 
 env:
-  PythonVersion: 3.8
+  PythonVersion: ${{ inputs.python-version }}
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest , windows-latest]
+        python-version: ['3.8', '3.9']
     defaults:
       run:
         working-directory: ./src
@@ -22,53 +44,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install coverage flake8
           pip install -r requirements.txt
-
       - name: Run tests
         run: |
           python manage.py test
-
       - name: Generate Report
         run: |
           coverage run --source='.' manage.py test
           coverage report
-
       - name: Linting
         run: |
           flake8 . --show-source --statistics --exit-zero
-
       - name: Check Complexity
         run: |
           flake8 . --exit-zero --max-complexity=6
-
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
           path: .
+        # Забезпечення унікальної назви артефакту.
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ github.workspace }}/helm-charts
+        # Забезпечення унікальної назви артефакту.
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ github.workspace }}/cluster.yml
+        # Забезпечення унікальної назви артефакту.
 
   docker-ci:
     name: Build and Push Image
@@ -76,25 +96,25 @@ jobs:
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
     steps:
+      - uses: actions/download-artifact@v4
+        name: Download python artifacts
+        with:
+          name: python-artifacts-${{ github.run_id }}-ubuntu-latest-3.8
+          path: .
+        # Забезпечення завантаження унікальних python артефактів.
 
-    - uses: actions/download-artifact@v4
-      name: Download python artifacts
-      with:
-        name: python-artifacts
-        path: .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        push: true
-        context: ./src
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: ./src
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
     runs-on: ubuntu-latest
@@ -102,29 +122,29 @@ jobs:
     if: github.ref_name == 'main'
     name: Helm CI
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts-${{ github.run_id }}-ubuntu-latest-3.8
+          path: .
+        # Забезпечення завантаження унікальних Helm артефактів.
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: helm-artifacts
-        path: .
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
 
-    - name: Set Up Helm
-      uses: azure/setup-helm@v4.2.0
+      - name: Lint helm
+        run: helm lint ./todoapp/
 
-    - name: Lint helm
-      run: helm lint ./todoapp/
+      - name: Template Helm
+        run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
 
-    - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      - name: Package Helm
+        run: helm package ./todoapp
 
-    - name: Package Helm
-      run: helm package ./todoapp
-
-    - name: Upload Helm Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: helm-package
-        path: ./*.tgz
+      - name: Upload Helm Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-package-${{ github.run_id }}
+          path: ./*.tgz
 
   deploy-helm-dev:
     name: Deploy helm to Development
@@ -134,6 +154,8 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+      helm-values-path: ${{ github.event.inputs.helm-values-path }}
+      helm-release-name: ${{ github.event.inputs.helm-release-name }}
 
   deploy-helm-stg:
     name: Deploy helm to Staging
