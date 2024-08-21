@@ -11,6 +11,8 @@ To complete this task, you will need:
 Follow these steps to get the application up and running on your local machine (requires Python 3.8 or higher due to compatibility with Django 4):
 
 
+
+
 ```
 pip install -r requirements.txt
 ```
