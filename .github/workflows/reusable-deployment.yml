@@ -17,27 +17,41 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+      OsType:
+        required: true
+        type: string
+      PythonVersion:
+        required: true
+        type: string
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
+      runs-on: ${{ inputs.OsType }}-latest
       environment: ${{ inputs.environment }}
 
       steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: helm-package-${{ inputs.OsType }}-latest-${{ inputs.PythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.OsType }}-latest-${{ inputs.PythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ inputs.OsType }}-latest-${{ inputs.PythonVersion }}
           path: .
+
+      - name: Install wget for Windows
+        if: inputs.OsType == 'windows'
+        run: choco install wget -y
+
+      - name: Install kind for Windows
+        if: inputs.OsType == 'windows'
+        run: choco install kind -y
 
       - name: Set Up Helm
         uses: azure/setup-helm@v4.2.0
@@ -62,7 +76,8 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository="${{secrets.DOCKERHUB_USERNAME}}/${{ vars.DOCKERIMAGENAME }}" \
+          --set todoapp.image.tag=${{ inputs.version }}
 
       - name: Deploy helm to Development
         run: |
@@ -76,5 +91,5 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          --set todoapp.image.repository="${{secrets.DOCKERHUB_USERNAME}}/${{ vars.DOCKERIMAGENAME }}" \
+          --set todoapp.image.tag=${{ inputs.version }}
