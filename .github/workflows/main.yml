@@ -8,13 +8,30 @@ on:
   pull_request:
     branches: ["main"]
 
+  workflow_dispatch:
+    inputs:
+      artifact_choice:
+        description: 'Choose artifact to deploy'
+        required: true
+        default: 'ubuntu-latest-3.8'
+        type: choice
+        options: ['ubuntu-latest-3.8', 'ubuntu-latest-3.9', 'windows-latest-3.8', 'windows-latest-3.9']
+
+concurrency:
+  group: ${{ github.workflow }} - ${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +39,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Setup Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -51,23 +68,24 @@ jobs:
           flake8 . --exit-zero --max-complexity=6
 
       - name: Upload python artifacts
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -80,7 +98,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ github.event.inputs.artifact_choice  || 'ubuntu-latest-3.8' }}
         path: .
 
     - name: Login to Docker Hub
@@ -105,10 +123,10 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice  || 'ubuntu-latest-3.8' }}
         path: .
 
-    - name: Set Up Helm
+    - name: Setup Helm
       uses: azure/setup-helm@v4.2.0
 
     - name: Lint helm
@@ -134,6 +152,7 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+      artifact_choice: ${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
 
   deploy-helm-stg:
     name: Deploy helm to Staging
@@ -145,3 +164,5 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
+      artifact_choice: ${{ github.event.inputs.artifact_choice || 'ubuntu-latest-3.8' }}
+
