@@ -1,6 +1,6 @@
 name: python-deployment
 
-run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
+run-name: ${{ github.actor }} - ${{ github.ref_name}} - ${{ github.sha }}
 
 on:
   push:
@@ -8,13 +8,29 @@ on:
   pull_request:
     branches: ["main"]
 
+  workflow_dispatch:
+    inputs:
+      artifact_choice:
+        description: "Deploy Artefact"
+        required: true
+        default: 'ubuntu-latest-3.8'
+        type: choice
+        options: ['windows-latest-3.8', 'windows-latest-3.9', 'ubuntu-latest-3.8', 'ubuntu-latest-3.9']
+
+concurrency:
+  group: ${{ github.workflow }} - ${{ github.ref }}
+  cancel-in-progress: true
+
 env:
-  PythonVersion: 3.8
-  DockerImageName: todoapp
+  DockerImageName: garimanblack/todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +38,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -51,23 +67,24 @@ jobs:
           flake8 . --exit-zero --max-complexity=6
 
       - name: Upload python artifacts
+        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -80,7 +97,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ github.event.inputs.artifact_choice }}
         path: .
 
     - name: Login to Docker Hub
@@ -105,7 +122,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts
+        name: helm-artifacts-${{ github.event.inputs.artifact_choice }}
         path: .
 
     - name: Set Up Helm
@@ -134,14 +151,24 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
+      helm-release-name: todoapp-development
+      artifact_matrix: ${{ github.event.inputs.artifact_choice}}
+
+  request-approval:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Wait for approval
+        run: echo "Waiting for manual"
 
   deploy-helm-stg:
     name: Deploy helm to Staging
     uses: ./.github/workflows/reusable-deployment.yml
-    needs: [deploy-helm-dev]
+    needs: [deploy-helm-dev, request-approval]
     secrets: inherit
     with:
       environment: staging
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
+      artifact_matrix: ${{ github.event.inputs.artifact_choice}}

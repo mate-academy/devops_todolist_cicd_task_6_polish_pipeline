@@ -17,6 +17,10 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+      artifact_matrix:
+        default: 'ubuntu-latest-3.9'
+        type: string
+        required: true
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
@@ -31,12 +35,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ github.event.inputs.artifact_matrix }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ github.event.inputs.artifact_matrix }}
           path: .
 
       - name: Set Up Helm
@@ -77,4 +81,3 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
-
