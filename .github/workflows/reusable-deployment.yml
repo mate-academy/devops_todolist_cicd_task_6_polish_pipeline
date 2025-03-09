@@ -1,6 +1,7 @@
 name: helm-upgrade
 run-name: ${{ github.actor }} - ${{ github.ref_name }}
 
+
 on:
   workflow_call:
     inputs:
@@ -17,6 +18,21 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Select which artifact to deploy"
+        required: true
+        type: choice
+        options:
+          - ubuntu-3.8
+          - ubuntu-3.9
+          - windows-3.8
+          - windows-3.9
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
@@ -77,4 +93,32 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
+    test:
+     runs-on: ${{ matrix.os }}
+     strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu-latest, windows-latest]
 
+     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
+    deploy-staging:
+     runs-on: ubuntu-latest
+     environment:
+      name: staging
+      url: https://staging.example.com
+     steps:
+      - name: Wait for approval
+        uses: hmarr/auto-approve-action@v3
