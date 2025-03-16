@@ -32,8 +32,8 @@ jobs:
     name: Python CI
     strategy:
       matrix:
-        pythonVersion: ${{ inputs.python-version }}
-        osType: ${{ inputs.os-type }}
+        pythonVersion: ${{ toJson(inputs.python-version) }}
+        osType: ${{ toJson(inputs.os-type) }}
     runs-on: ${{ matrix.osType }}
     defaults:
       run:
