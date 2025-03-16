@@ -4,17 +4,36 @@ run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "deploy"]
   pull_request:
     branches: ["main"]
 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment deploy to..."
+        required: true
+        type: choice
+        options: ['development', 'staging']
+      os-type:
+        description: "Type of operation system"
+        type: choice
+        options: ['ubuntu-latest', 'windows-latest']
+      python-version:
+        description: "Version of Python"
+        type: choice
+        options: ['3.8', '3.9']
+
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pythonVersion: ${{ inputs.python-version }}
+        osType: ${{ inputs.os-type }}
+    runs-on: ${{ matrix.osType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +41,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.pythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.pythonVersion }}
 
       - name: Install dependencies
         run: |
