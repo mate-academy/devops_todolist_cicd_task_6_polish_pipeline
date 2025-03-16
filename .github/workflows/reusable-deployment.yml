@@ -31,12 +31,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ github.event.inputs.os-type }}-${{ github.event.inputs.python-version }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ github.event.inputs.os-type }}-${{ github.event.inputs.python-version }}
           path: .
 
       - name: Set Up Helm
