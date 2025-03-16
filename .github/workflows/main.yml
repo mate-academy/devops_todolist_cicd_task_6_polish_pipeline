@@ -24,6 +24,10 @@ on:
         type: choice
         options: ['3.8', '3.9']
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DockerImageName: todoapp
 
@@ -32,8 +36,8 @@ jobs:
     name: Python CI
     strategy:
       matrix:
-        pythonVersion: '${{ toJson(inputs.python-version) }}'
-        osType: '${{ toJson(inputs.os-type) }}'
+        pythonVersion: ["ubuntu-latest", "windows-latest"]
+        osType: [3.8, 3.9]
     runs-on: ${{ matrix.osType }}
     defaults:
       run:
@@ -73,21 +77,21 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -100,7 +104,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ github.event.inputs.artifact_matrix }}
         path: .
 
     - name: Login to Docker Hub
@@ -125,7 +129,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts
+        name: helm-artifacts-${{ github.event.inputs.artifact_matrix }}
         path: .
 
     - name: Set Up Helm
