@@ -29,6 +29,7 @@ env:
 
 jobs:
   python-ci:
+    name: Python CI
     strategy:
       matrix:
         pythonVersion: ${{ inputs.python-version }}
