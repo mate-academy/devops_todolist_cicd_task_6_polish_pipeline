@@ -4,25 +4,25 @@ run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
   push:
-    branches: ["main", "deploy"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment deploy to..."
         required: true
+        description: "Environment deploy to..."
         type: choice
         options: ['development', 'staging']
       os-type:
-        description: "Type of operation system"
         required: true
+        description: "Type of operation system"
         type: choice
         options: ['ubuntu-latest', 'windows-latest']
       python-version:
-        description: "Version of Python"
         required: true
+        description: "Version of Python"
         type: choice
         options: ['3.8', '3.9']
 
@@ -39,7 +39,7 @@ jobs:
     strategy:
       matrix:
         pythonVersion: [3.8, 3.9]
-        osType: ["ubuntu-latest", "windows-latest"]
+        osType: ['ubuntu-latest', 'windows-latest']
     runs-on: ${{ matrix.osType }}
     defaults:
       run:
@@ -95,6 +95,36 @@ jobs:
         with:
           name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: ${{ github.workspace }}/cluster.yml
+
+  dump_contexts_to_log:
+    runs-on: ubuntu-latest
+    needs: python-ci
+    steps:
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+      - name: Dump job context
+        env:
+          JOB_CONTEXT: ${{ toJson(job) }}
+        run: echo "$JOB_CONTEXT"
+      - name: Dump steps context
+        env:
+          STEPS_CONTEXT: ${{ toJson(steps) }}
+        run: echo "$STEPS_CONTEXT"
+      - name: Dump runner context
+        env:
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+        run: echo "$RUNNER_CONTEXT"
+      - name: Dump strategy context
+        env:
+          STRATEGY_CONTEXT: ${{ toJson(strategy) }}
+        run: echo "$STRATEGY_CONTEXT"
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
 
   docker-ci:
     name: Build and Push Image
