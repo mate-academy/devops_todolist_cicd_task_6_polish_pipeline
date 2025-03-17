@@ -17,6 +17,12 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+      mainOS:
+        default: ubuntu-latest
+        type: string
+      mainPythonVersion:
+        default: '3.8'
+        type: string
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
@@ -31,12 +37,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.mainOS }}-${{ inputs.mainPythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ inputs.mainOS }}-${{ inputs.mainPythonVersion }}
           path: .
 
       - name: Set Up Helm
