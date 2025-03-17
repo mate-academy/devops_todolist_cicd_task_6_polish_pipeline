@@ -38,8 +38,8 @@ jobs:
     name: Python CI
     strategy:
       matrix:
-        pythonVersion: ["ubuntu-latest", "windows-latest"]
-        osType: [3.8, 3.9]
+        pythonVersion: [3.8, 3.9]
+        osType: ["ubuntu-latest", "windows-latest"]
     runs-on: ${{ matrix.osType }}
     defaults:
       run:
@@ -171,4 +171,3 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
-      
