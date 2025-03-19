@@ -7,8 +7,11 @@ mysql:
 todoapp:
   namespace: todoapp
   image:
-    repository: ikulyk404/todoapp
-    tag: "4.0.1"
+    repository: rozdorozhnii/todoapp
+    tag: "4.1.0"
+
+  service:
+    nodePort: 30007
 
   resources:
     requests:
@@ -19,11 +22,11 @@ todoapp:
       cpu: "150m"
 
   secrets:
-    SECRET_KEY: zdfsadfsadfsfs
-    DB_NAME: app_db
-    DB_USER: app_user
-    DB_PASSWORD: 1234
-    DB_HOST: mysql-0.mysql.mysql.svc.cluster.local
+    SECRET_KEY: placeholder
+    DB_NAME: placeholder
+    DB_USER: placeholder
+    DB_PASSWORD: placeholder
+    DB_HOST: placeholder
 
   hpa:
     minReplicas: 2
