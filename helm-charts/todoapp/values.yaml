@@ -37,4 +37,4 @@ todoapp:
     persistentVolume:
       capacity: "1Gi"
     persistentVolumeClaim:
-      requestStorage: "1Gi"
+      requestStorage: "1Gi"  
