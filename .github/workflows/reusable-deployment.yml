@@ -11,32 +11,44 @@ on:
       version:
         required: true
         type: string
+      artifact-name:
+        required: true
+        type: string
+      helm-artifact-name:
+        required: true
+        type: string
+      kind-artifact-name:
+        required: true
+        type: string
       helm-values-path:
         type: string
         default: './todoapp/values.yaml'
       helm-release-name:
         default: todoapp
         type: string
+      DockerImageName:
+        required: true
+        type: string
+
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
-
-      steps:
+  deploy-helm:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: ${{ inputs.artifact-name }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: ${{ inputs.helm-artifact-name }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: ${{ inputs.kind-artifact-name }}
           path: .
 
       - name: Set Up Helm
@@ -62,6 +74,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository=${{ inputs.DockerImageName }} \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
@@ -76,5 +89,5 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository=${{ inputs.DockerImageName }} \
           --set todoapp.image.tag=${{ github.sha }}
-
