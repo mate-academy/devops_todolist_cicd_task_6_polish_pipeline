@@ -1,80 +1,75 @@
-name: helm-upgrade
-run-name: ${{ github.actor }} - ${{ github.ref_name }}
+name: deploy-to-kind
+
+run-name: Deploy to ${{ inputs.environment }}
 
 on:
   workflow_call:
     inputs:
       environment:
-        required: true
-        description: 'Environment to deploy to'
-        type: string
-      version:
+        description: 'Target environment'
         required: true
         type: string
+      artifact:
+        description: 'Select artifact from matrix'
+        required: true
+        type: choice
+        options: [ubuntu-3.8, ubuntu-3.9, windows-3.8, windows-3.9]
       helm-values-path:
+        description: 'Path to Helm values'
         type: string
         default: './todoapp/values.yaml'
       helm-release-name:
-        default: todoapp
+        description: 'Helm release name'
         type: string
+        default: 'todoapp'
+
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-kind:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}-${{ github.ref_name }}
+      cancel-in-progress: true
 
-      steps:
-      - uses: actions/download-artifact@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download python artifact
+        uses: actions/download-artifact@v4
         with:
-          name: helm-package
-          path: .
+          name: python-artifacts-${{ inputs.artifact }}
+          path: ./src
 
-      - uses: actions/download-artifact@v4
+      - name: Download Helm package
+        uses: actions/download-artifact@v4
         with:
           name: helm-artifacts
           path: .
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: kind-cluster
-          path: .
+      - name: Install Kind CLI
+        run: |
+          curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x kind
+          sudo mv kind /usr/local/bin/
 
-      - name: Set Up Helm
-        uses: azure/setup-helm@v4.2.0
+      - name: Create Kind cluster
+        run: kind create cluster --config cluster.yml
 
       - name: Set up Kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          config: ./cluster.yml
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.2.0
 
-      - name: Dry Run Helm
+      - name: Helm install (dry-run)
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          helm install ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+            -f ${{ inputs.helm-values-path }} \
+            --dry-run
 
-      - name: Deploy helm to Development
+      - name: Helm upgrade/install (atomic)
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          helm upgrade --install ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+            -f ${{ inputs.helm-values-path }} \
+            --atomic --wait --timeout 300s
