@@ -30,7 +30,11 @@ jobs:
     concurrency:
       group: deploy-${{ inputs.environment }}-${{ github.ref_name }}
       cancel-in-progress: true
+
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4    # ← додаємо, щоб було доступно cluster.yml
+
       - name: Download python artifact
         uses: actions/download-artifact@v4
         with:
@@ -50,7 +54,7 @@ jobs:
           sudo mv kind /usr/local/bin/
 
       - name: Create Kind cluster
-        run: kind create cluster --config cluster.yml
+        run: kind create cluster --config cluster.yml  # ← тепер cluster.yml є після checkout
 
       - name: Set up Kubectl
         uses: azure/setup-kubectl@v4
