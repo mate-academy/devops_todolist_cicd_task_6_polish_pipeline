@@ -63,7 +63,7 @@ jobs:
         name: Upload python artifact
         with:
           name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
-          path: .
+          path: src
 
   docker-ci:
     name: Build & Push Docker image
@@ -88,7 +88,7 @@ jobs:
     name: Deploy to Development (Kind)
     if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: docker-ci
-    uses: ./.github/workflows/deploy-to-kind.yml
+    uses: ./.github/workflows/reusable-deployment.yml
     secrets: inherit
     with:
       environment: development
@@ -98,7 +98,7 @@ jobs:
     name: Deploy to Staging (Kind)
     if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: deploy-kind-dev
-    uses: ./.github/workflows/deploy-to-kind.yml
+    uses: ./.github/workflows/reusable-deployment.yml
     secrets: inherit
     with:
       environment: staging
