@@ -31,12 +31,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-ubuntu-latest-3.8
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-ubuntu-latest-3.8
           path: .
 
       - name: Set Up Helm
@@ -57,11 +57,13 @@ jobs:
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set mysql.namespace="${{ vars.MYSQL_NS }}" \
           --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
           --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
+          --set todoapp.namespace="${{ vars.APP_NS }}" \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
@@ -71,10 +73,11 @@ jobs:
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set mysql.namespace="${{ vars.MYSQL_NS }}" \
           --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
           --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
+          --set todoapp.namespace="${{ vars.APP_NS }}" \
           --set todoapp.image.tag=${{ github.sha }}
-
