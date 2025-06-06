@@ -1,55 +1,64 @@
-# Django ToDo list
+# Enhanced CI/CD Pipeline with GitHub Actions
 
-This is a to-do list web application with the basic features of most web apps, such as accounts/login, API, and interactive UI. 
-To complete this task, you will need:
+# Project Overview:
 
-- CSS | [Skeleton](http://getskeleton.com/)
-- JS  | [jQuery](https://jquery.com/)
+This project demonstrates the existing GitHub Actions CI/CD workflow by integrating Docker image building and pushing to DockerHub. It also introduces advanced workflow features such as matrix testing, manual workflow triggers, environment-specific deployments, and branch protection policies.
 
-## Explore
+# Tech Stack:
 
-Follow these steps to get the application up and running on your local machine (requires Python 3.8 or higher due to compatibility with Django 4):
+- Python (Django)
+- Docker & DockerHub
+- Helm
+- Kubernetes (Azure Kubernetes Service)
+- GitHub Actions (CI/CD)
+- GitHub Actions Environments & Secrets
+- GitHub protection policies
 
+# What was done:
 
-```
-pip install -r requirements.txt
-```
+- Stored DockerHub credentials, and other sensitive data as GitHub Actions repository/environment secrets.
+- Developed a main and reusable GitHub Actions workflow to deploy Helm charts to an Kubernetes (kind)
 
-Create a database schema:
+- Continuous Integration included:
 
-```
-python manage.py migrate
-```
+  - Matrix Testing:
+    - Runs unit tests across multiple Python versions: 3.8, 3.9
+    - Runs tests on both Ubuntu and Windows runners
 
-And then start the server (default is <http://localhost:8000>):
+  - Docker CI:
+    - Created a Docker image of the Django application using semantic versioning.
+    - The image is built and tagged automatically via GitHub Actions
 
-```
-python manage.py runserver
-```
+  - Manual Workflow Dispatch:
+    - Supports manual triggering with input selection (e.g., windows-3.8, ubuntu-3.9)
+    - Enables flexible artifact selection for deployment
 
-You can now browse the [API](http://localhost:8000/api/) or start on the [landing page](http://localhost:8000/).
+- Continuous Deployment  included:
 
-## Task
+  - Handled via a reusable workflow (deployment-workflow.yml) and triggered automatically on push to main.
 
-Extend the project's GitHub Actions workflow by integrating Docker to build and push images to DockerHub.
-This CI/CD enhancement involves several key tasks:
+  - Manual Approval:
+    - Staging deployments require human approval before proceeding
 
-1. Update your forked repository with your DockerHub username and password.
-    1. Add corresponding secrets to the repository.
-2. Update `DockerImageName` with the DockerHub image repository name.
-3. Add environment secrets for `development` and `staging` environments for your forked repository.
-4. Use Matrix to run unit tests on different Python versions (3.8, 3.9).
-5. Use Matrix to run unit tests on different OS types: Ubuntu and Windows.
-6. You should have the ability to start the workflow manually.
-7. Add input variables for the manual workflow start:
-    1. Input variables to choose which artifact from the matrix to deploy. (windows-3.8, ubuntu-3.9, etc).
-8. Add branch protection to the main branch in your fork.
-9. Add mandatory pull requests and `Python CI` job status checks for PRs.
-10. Add Manual Approval for the `staging` environment.
-11. Allow to run only one workflow per pull request (concurrency).
-12. New runs should cancel the previous runs.
-13. Create a Pull Request with the changes.
-14. Pull Requests description should also contain a reference to a workflow run with successful
-workflow execution.
-15. Provide screenshots confirming that branch protection and status checks are working as expected.
-16. Provide a screenshot confirming `staging` deployment requires manual approval.
+  - Concurrency Control:
+    - Only one workflow per PR is allowed
+    - Ongoing runs are canceled if a new one starts
+
+  - Branch Protection:
+    - main branch is protected
+    - enforces status checks and mandatory pull requests
+
+  - Performs Helm dry-run to catch release issues early.
+  - Executes atomic helm upgrade --install to ensure safe deployment
+
+  - Supports multiple environments:
+    - development
+    - staging (with custom values/stg.yaml)
+
+- Helm Charts included:
+  - todoapp/: Helm chart for the Django application
+  - mysql/: Reused chart from a previous task for MySQL backend
+
+# Link to the successful GitHub Actions run:
+https://github.com/konstantinou77/devops_todolist_cicd_task_6_polish_pipeline/actions/runs/14909718736
+
