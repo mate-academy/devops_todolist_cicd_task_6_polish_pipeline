@@ -31,12 +31,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-3.9-ubuntu-latest
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-3.9-ubuntu-latest
           path: .
 
       - name: Set Up Helm
@@ -77,4 +77,3 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
-
