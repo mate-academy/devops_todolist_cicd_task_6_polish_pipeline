@@ -4,17 +4,39 @@ run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
+  workflow_dispatch:
+    inputs:
+      osType:
+        description: 'Os to use in Python CI'
+        required: true
+        type: choice
+        default: ubuntu-latest
+        options: [ubuntu-latest, windows-latest]
+      pythonVersion:
+        description: 'Python version to use'
+        required: true
+        default: '3.8'
+        type: choice
+        options: ['3.8', '3.9']
 
 env:
-  PythonVersion: 3.8
-  DockerImageName: todoapp
+  DockerImageName: mate2py
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pythonVersion: [3.8, 3.9]
+        osType: [ubuntu-latest, windows-latest]
+    name: Python CI
+    runs-on: ${{matrix.osType}}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +44,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.pythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.pythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -50,21 +72,29 @@ jobs:
         run: |
           flake8 . --exit-zero --max-complexity=6
 
+      - name: Debug matrix and inputs
+        run: |
+          echo "matrix.osType=${{ matrix.osType }}"
+          echo "matrix.pythonVersion=${{ matrix.pythonVersion }}"
+          echo "input.osType=${{ github.event.inputs.osType }}"
+          echo "input.pythonVersion=${{ github.event.inputs.pythonVersion }}"
+
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
+        if: matrix.osType == 'ubuntu-latest' && matrix.pythonVersion == 3.8
         with:
           name: python-artifacts
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.osType == 'ubuntu-latest' && matrix.pythonVersion == 3.8
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.osType == 'ubuntu-latest' && matrix.pythonVersion == 3.8
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -76,58 +106,56 @@ jobs:
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
     steps:
+      - uses: actions/download-artifact@v4
+        name: Download python artifacts
+        with:
+          name: python-artifacts
+          path: .
 
-    - uses: actions/download-artifact@v4
-      name: Download python artifacts
-      with:
-        name: python-artifacts
-        path: .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        push: true
-        context: ./src
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: ./src
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
+    name: Helm CI
     runs-on: ubuntu-latest
     needs: python-ci
     if: github.ref_name == 'main'
-    name: Helm CI
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: helm-artifacts
-        path: .
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
 
-    - name: Set Up Helm
-      uses: azure/setup-helm@v4.2.0
+      - name: Lint helm
+        run: helm lint ./todoapp/
 
-    - name: Lint helm
-      run: helm lint ./todoapp/
+      - name: Template Helm
+        run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
 
-    - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      - name: Package Helm
+        run: helm package ./todoapp
 
-    - name: Package Helm
-      run: helm package ./todoapp
-
-    - name: Upload Helm Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: helm-package
-        path: ./*.tgz
+      - name: Upload Helm Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-package
+          path: ./*.tgz
 
   deploy-helm-dev:
-    name: Deploy helm to Development
+    name: Deploy helm to Development(1.2)
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [helm-ci, docker-ci]
     secrets: inherit
@@ -136,7 +164,7 @@ jobs:
       version: ${{ github.sha }}
 
   deploy-helm-stg:
-    name: Deploy helm to Staging
+    name: Deploy helm to Staging(1.2)
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [deploy-helm-dev]
     secrets: inherit

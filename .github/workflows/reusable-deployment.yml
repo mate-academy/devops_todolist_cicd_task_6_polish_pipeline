@@ -18,12 +18,12 @@ on:
         default: todoapp
         type: string
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-helm:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
+    steps:
       - uses: actions/download-artifact@v4
         with:
           name: helm-package
@@ -77,4 +77,3 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
-
