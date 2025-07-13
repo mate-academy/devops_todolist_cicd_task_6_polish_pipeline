@@ -7,14 +7,36 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs: 
+      environment:
+        description: "Environmrnt deploy to"
+        required: true 
+        type: choice 
+        options: ["development", "staging", "producttion"]
+      message:
+        description: "Test Message"
+        required: false 
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true 
 
 env:
   PythonVersion: 3.8
-  DockerImageName: todoapp
+  DockerImageName: todoapp-python
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OSType: [ubuntu-latest, windows-latest]
+
+    name: Python-CI
+    runs-on: ${{ matrix.OSType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +44,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
