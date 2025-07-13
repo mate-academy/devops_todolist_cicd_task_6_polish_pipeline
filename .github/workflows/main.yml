@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs: 
       environment:
-        description: "Environmrnt deploy to"
+        description: "Environment deploy to"
         required: true 
         type: choice 
-        options: ["development", "staging", "producttion"]
+        options: ["development", "staging", "production"]
       message:
         description: "Test Message"
         required: false 
