@@ -16,7 +16,6 @@ pip install -r requirements.txt
 ```
 
 Create a database schema:
-
 ```
 python manage.py migrate
 ```
