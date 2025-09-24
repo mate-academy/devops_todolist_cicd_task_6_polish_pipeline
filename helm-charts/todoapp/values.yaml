@@ -19,11 +19,11 @@ todoapp:
       cpu: "150m"
 
   secrets:
-    SECRET_KEY: zdfsadfsadfsfs
-    DB_NAME: app_db
-    DB_USER: app_user
-    DB_PASSWORD: 1234
-    DB_HOST: mysql-0.mysql.mysql.svc.cluster.local
+    SECRET_KEY: "<REPLACE_WITH_SECRET>"
+    DB_NAME: "<REPLACE_WITH_SECRET>"
+    DB_USER: "<REPLACE_WITH_SECRET>"
+    DB_PASSWORD: "<REPLACE_WITH_SECRET>"
+    DB_HOST: "<REPLACE_WITH_SECRET>"
 
   hpa:
     minReplicas: 2
