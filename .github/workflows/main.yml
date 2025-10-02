@@ -7,6 +7,22 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'production']
+      message:
+        description: 'Message to include in the deployment'
+        required: false
+        type: string
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
@@ -14,7 +30,13 @@ env:
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.OsType }}
+    name: Python CI
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +44,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+            python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -51,20 +73,21 @@ jobs:
           flake8 . --exit-zero --max-complexity=6
 
       - name: Upload python artifacts
+        if: matrix.OsType == 'ubuntu-latest' && matrix.PythonVersion == '3.9'
         uses: actions/upload-artifact@v4
         with:
           name: python-artifacts
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.OsType == 'ubuntu-latest' && matrix.PythonVersion == '3.9'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.OsType == 'ubuntu-latest' && matrix.PythonVersion == '3.9'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
