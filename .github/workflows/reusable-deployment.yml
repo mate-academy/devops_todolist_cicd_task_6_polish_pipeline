@@ -63,7 +63,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
 
       - name: Deploy helm to Development
         run: |
@@ -77,4 +77,4 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
