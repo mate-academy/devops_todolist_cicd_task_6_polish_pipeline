@@ -9,7 +9,7 @@ on:
     branches: ["main"]
   workflow_dispatch:
     inputs:
-      artifact:
+      artifacts:
         description: "which artefact to deploy"
         required: true
         type: choice
@@ -18,9 +18,11 @@ on:
           - ubuntu-latest-3.9
           - windows-latest-3.8
           - windows-latest-3.9
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true          
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
@@ -72,17 +74,17 @@ jobs:
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+          name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+          name: kind-cluster
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -95,7 +97,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: python-artifacts-ubuntu-latest-3.8
         path: .
 
     - name: Login to Docker Hub
@@ -120,7 +122,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: helm-artifacts
         path: .
 
     - name: Set Up Helm
@@ -138,7 +140,7 @@ jobs:
     - name: Upload Helm Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: helm-package-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+        name: helm-package
         path: ./*.tgz
 
   deploy-helm-dev:
@@ -149,8 +151,6 @@ jobs:
     with:
       environment: development
       version: ${{ github.sha }}
-      OsType: ${{ matrix.OsType }}
-      PythonVersion: ${{ matrix.PythonVersion }}
 
   deploy-helm-stg:
     name: Deploy helm to Staging
@@ -162,5 +162,4 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
-      OsType: ${{ matrix.OsType }}
-      PythonVersion: ${{ matrix.PythonVersion }}
+      

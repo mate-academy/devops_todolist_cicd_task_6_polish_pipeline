@@ -4,12 +4,6 @@ run-name: ${{ github.actor }} - ${{ github.ref_name }}
 on:
   workflow_call:
     inputs:
-      OsType:
-        required: true
-        type: string
-      PythonVersion:
-        required: true
-        type: string
       environment:
         required: true
         description: 'Environment to deploy to'
@@ -23,6 +17,7 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+        
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
@@ -32,17 +27,17 @@ jobs:
       steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+          name: helm-package
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+          name: helm-artifacts
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
+          name: kind-cluster
           path: .
 
       - name: Set Up Helm
