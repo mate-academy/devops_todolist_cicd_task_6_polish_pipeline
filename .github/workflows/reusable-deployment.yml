@@ -4,6 +4,12 @@ run-name: ${{ github.actor }} - ${{ github.ref_name }}
 on:
   workflow_call:
     inputs:
+      OsType:
+        required: true
+        type: string
+      PythonVersion:
+        required: true
+        type: string
       environment:
         required: true
         description: 'Environment to deploy to'
