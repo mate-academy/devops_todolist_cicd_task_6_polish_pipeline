@@ -162,3 +162,5 @@ jobs:
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
+      OsType: ${{ matrix.OsType }}
+      PythonVersion: ${{ matrix.PythonVersion }}
