@@ -1,80 +1,70 @@
-name: helm-upgrade
-run-name: ${{ github.actor }} - ${{ github.ref_name }}
+name: reusable-deploy
 
 on:
   workflow_call:
     inputs:
       environment:
         required: true
-        description: 'Environment to deploy to'
+        description: "Environment to deploy to (dev|staging)"
         type: string
-      version:
+      cluster_name:
         required: true
         type: string
-      helm-values-path:
+      namespace:
+        required: true
         type: string
-        default: './todoapp/values.yaml'
-      helm-release-name:
-        default: todoapp
+      chart_path:
+        required: true
         type: string
+      release_name:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: helm-package
-          path: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: helm-artifacts
-          path: .
+      - name: Install kind and kubectl
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+          chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind
+          sudo apt-get update && sudo apt-get install -y kubectl
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: kind-cluster
-          path: .
+      - name: Create kind cluster
+        run: kind create cluster --name "${{ inputs.cluster_name }}" --config ./deploy/cluster.yml
 
-      - name: Set Up Helm
+      - name: Setup Helm
         uses: azure/setup-helm@v4.2.0
 
-      - name: Set up Kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          config: ./cluster.yml
-
-      - name: Dry Run Helm
+      - name: Helm dry-run install
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          helm dependency update "${{ inputs.chart_path }}" || true
+          helm install "${{ inputs.release_name }}" "${{ inputs.chart_path }}" \
+            --namespace "${{ inputs.namespace }}" --create-namespace \
+            --set image.repository="${{ inputs.image }}" \
+            --set image.tag="${{ inputs.image_tag }}" \
+            --dry-run
 
-      - name: Deploy helm to Development
+      - name: Helm upgrade --install (atomic)
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          helm upgrade --install "${{ inputs.release_name }}" "${{ inputs.chart_path }}" \
+            --namespace "${{ inputs.namespace }}" --create-namespace \
+            --set image.repository="${{ inputs.image }}" \
+            --set image.tag="${{ inputs.image_tag }}" \
+            --atomic --wait --timeout 5m
 
+      - name: Post-deploy status
+        run: |
+          helm status "${{ inputs.release_name }}" --namespace "${{ inputs.namespace }}" || true
+          kubectl get all -n "${{ inputs.namespace }}" -o wide || true
