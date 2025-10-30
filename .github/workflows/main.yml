@@ -34,14 +34,13 @@ on:
 
 env:
   PythonVersionDefault: 3.8
-  DockerImageName: yourdockerhubusername/django-todo   # ЗАМІНИ на свій DockerHub репозиторій
+  DockerImageName: chornoknysh/todoapp
   ChartPath: ./helm-charts
   ReleaseNameDev: todo-dev
   ReleaseNameStaging: todo-staging
   NamespaceDev: todo-dev
   NamespaceStaging: todo-staging
 
-# Дозволяє лише один запуск на PR і скасовує попередні
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -101,9 +100,12 @@ jobs:
           path: ./todoapp
 
   docker-ci:
-    name: Build and push Docker image
     runs-on: ubuntu-latest
     needs: python-ci
+    strategy:
+      matrix:
+        os: [ubuntu, windows]
+        python: [3.8, 3.9]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -121,22 +123,19 @@ jobs:
           file: ./todoapp/Dockerfile
           push: true
           tags: |
-            ${{ env.DockerImageName }}:${{ github.sha }}
-            ${{ env.DockerImageName }}:latest
+            ${{ env.DockerImageName }}:${{ matrix.os }}-${{ matrix.python }}-${{ github.sha }}
 
   select-artifact:
-    name: Select matrix artifact for deploy
     runs-on: ubuntu-latest
-    needs: [python-ci, docker-ci]
+    needs: docker-ci
     outputs:
-      selected_name: ${{ steps.pick.outputs.selected_name }}
+      selected_tag: ${{ steps.pick.outputs.selected_tag }}
     steps:
-      - name: Pick artifact name
-        id: pick
+      - id: pick
         run: |
-          # Перетворюємо input виду "ubuntu-3.8" у назву артефакта "python-ci-ubuntu-3.8"
-          SELECTED="python-ci-${{ github.event.inputs.deploy_artifact || 'ubuntu-3.8' }}"
-          echo "selected_name=$SELECTED" >> $GITHUB_OUTPUT
+          # Наприклад, input = "ubuntu-3.8"
+          SELECTED="${{ github.event.inputs.deploy_artifact }}-${{ github.sha }}"
+          echo "selected_tag=$SELECTED" >> $GITHUB_OUTPUT
 
       - name: Download selected artifact
         uses: actions/download-artifact@v4
@@ -150,7 +149,7 @@ jobs:
   deploy:
     name: Deploy to ${{ github.event.inputs.deploy_environment || 'dev' }}
     needs: [select-artifact]
-    uses: ./.github/workflows/reusable-deploy.yml
+    uses: ./.github/workflows/reusable-deployment.yml
     with:
       environment: ${{ github.event.inputs.deploy_environment || 'dev' }}
       cluster_name: ${{ (github.event.inputs.deploy_environment || 'dev') == 'dev' && 'todo-dev' || 'todo-staging' }}
