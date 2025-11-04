@@ -1,0 +1,175 @@
+# .github/workflows/ci-cd.yml
+name: "Python + Docker + Helm CI/CD"
+run-name: "CI/CD by ${{ github.actor }} @ ${{ github.sha }}"
+
+on:
+  push:
+    branches: [ci_cd] # ← твоя робоча гілка (не main)
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      matrix_artifact:
+        description: "Який артефакт із матриці деплоїти (os-python)"
+        type: choice
+        required: true
+        options: [ubuntu-3.8, ubuntu-3.9, windows-3.8, windows-3.9]
+        default: ubuntu-3.9
+      target_env:
+        description: "Куди деплоїти"
+        type: choice
+        required: true
+        options: [development, staging]
+        default: development
+      image_tag:
+        description: "Тег образу (якщо не вказати — візьмемо SHA коміта)"
+        type: string
+        required: false
+        default: "latest" # не можна ставити ${{ github.sha }} на цьому рівні
+
+# одна джоба на PR, нові запуски скасовують попередні
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: "vitalysemeniv/todoapp" # твій репозиторій у Docker Hub
+  SRC_DIR: "workspace/src"
+  CHART_DIR: "workspace/helm-charts/todoapp"
+  CLUSTER_CFG: "workspace/cluster.yml"
+  RELEASE_NAME: "todoapp"
+
+jobs:
+  prepare-src:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (only once)
+        uses: actions/checkout@v4
+      - name: Upload raw source
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: ./
+
+  # Матриця: 2 ОС × 2 версії Python
+  python-ci:
+    needs: prepare-src
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os_name: ubuntu
+            python: "3.8"
+          - os: ubuntu-latest
+            os_name: ubuntu
+            python: "3.9"
+          - os: windows-latest
+            os_name: windows
+            python: "3.8"
+          - os: windows-latest
+            os_name: windows
+            python: "3.9"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download raw source
+        uses: actions/download-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: workspace
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install deps
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage flake8
+
+      - name: Tests with coverage
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          coverage run manage.py test
+          coverage xml -o coverage.xml
+
+      - name: Flake8 (non-blocking)
+        working-directory: ${{ env.SRC_DIR }}
+        run: flake8 .
+        continue-on-error: true
+
+      - name: Complexity (non-blocking)
+        working-directory: ${{ env.SRC_DIR }}
+        run: flake8 . --select=C901 --max-complexity=12
+        continue-on-error: true
+
+      - name: Upload TESTED source (matrix artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tested-src-${{ matrix.os_name }}-${{ matrix.python }}-${{ github.sha }}
+          path: workspace
+
+  docker-ci:
+    needs: [python-ci]
+    runs-on: ubuntu-latest
+    environment: development # щоб підтягнути env-secrets (DockerHub)
+    if: ${{ (github.event_name == 'push' && github.repository_owner == 'VitaliySemeniv') || github.event_name == 'workflow_dispatch' }}
+    env:
+      SELECTED_ARTIFACT: ${{ github.event_name == 'workflow_dispatch' && inputs.matrix_artifact || 'ubuntu-3.9' }}
+      SELECTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.sha }}
+    steps:
+      - name: Download TESTED source (chosen)
+        uses: actions/download-artifact@v4
+        with:
+          name: tested-src-${{ env.SELECTED_ARTIFACT }}-${{ github.sha }}
+          path: workspace
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.SRC_DIR }}
+          file: ${{ env.SRC_DIR }}/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.SELECTED_TAG }}
+
+    # deploy to development
+  deploy-dev:
+    needs: docker-ci
+    uses: ./.github/workflows/deploy-kind.yml
+    if: ${{ (github.event_name == 'push' && github.repository_owner == 'VitaliySemeniv') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'development') }}
+    with:
+      env_name: development
+      chart_dir: workspace/helm-charts/todoapp
+      release_name: todoapp
+      namespace: todo-dev
+      cluster_config: workspace/cluster.yml
+      image_name: "vitalysemeniv/todoapp"
+      image_tag: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.sha }}
+      tested_artifact: tested-src-${{ github.event_name == 'workflow_dispatch' && inputs.matrix_artifact || 'ubuntu-3.9' }}-${{ github.sha }}
+    secrets: inherit
+
+  # deploy to staging (manual approval через Environment rules)
+  deploy-staging:
+    needs: docker-ci
+    uses: ./.github/workflows/deploy-kind.yml
+    if: ${{ (github.event_name == 'push' && github.repository_owner == 'VitaliySemeniv') || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'staging') }}
+    with:
+      env_name: staging
+      chart_dir: workspace/helm-charts/todoapp
+      release_name: todoapp
+      namespace: todo-staging
+      cluster_config: workspace/cluster.yml
+      image_name: "vitalysemeniv/todoapp"
+      image_tag: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.sha }}
+      tested_artifact: tested-src-${{ github.event_name == 'workflow_dispatch' && inputs.matrix_artifact || 'ubuntu-3.9' }}-${{ github.sha }}
+    secrets: inherit

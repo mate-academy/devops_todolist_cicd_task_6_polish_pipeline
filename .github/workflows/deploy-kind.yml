@@ -1,0 +1,68 @@
+name: "Deploy to kind (reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      env_name: { type: string, required: true }
+      chart_dir: { type: string, required: true }
+      release_name: { type: string, required: true }
+      namespace: { type: string, required: true }
+      cluster_config: { type: string, required: true }
+      image_name: { type: string, required: true }
+      image_tag: { type: string, required: true }
+      tested_artifact: { type: string, required: true }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env_name }}
+
+    steps:
+      - name: Download tested source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.tested_artifact }}
+          path: workspace
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup kind
+        uses: helm/kind-action@v1.8.0
+        with:
+          config: ${{ inputs.cluster_config }}
+
+      - name: Verify cluster
+        run: kubectl get nodes
+
+      - name: Helm install --dry-run (server-side validation)
+        run: |
+          helm install ${{ inputs.release_name }} ${{ inputs.chart_dir }} \
+            --namespace ${{ inputs.namespace }} \
+            --create-namespace \
+            --dry-run --debug \
+            --set image.repository=${{ inputs.image_name }} \
+            --set image.tag=${{ inputs.image_tag }}
+
+      - name: Helm lint
+        run: helm lint ${{ inputs.chart_dir }}
+
+      - name: Helm package
+        run: |
+          mkdir -p helm-packages
+          helm package ${{ inputs.chart_dir }} --destination helm-packages
+
+      - name: Upload Helm chart package
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart-${{ inputs.env_name }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: helm-packages/*.tgz
+
+      - name: Helm upgrade --install (atomic)
+        run: |
+          helm upgrade --install ${{ inputs.release_name }} ${{ inputs.chart_dir }} \
+            --namespace ${{ inputs.namespace }} \
+            --create-namespace \
+            --atomic --wait \
+            --set image.repository=${{ inputs.image_name }} \
+            --set image.tag=${{ inputs.image_tag }}
