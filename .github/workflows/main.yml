@@ -1,5 +1,9 @@
 name: python-deployment
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
@@ -7,25 +11,53 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      matrix_artifact:
+        description: 'Matrix artifact name (e.g., python-artifacts-ubuntu-latest-3.9)'
+        required: true
+        type: choice
+        default: 'python-artifacts-ubuntu-latest-3.9'
+        options:
+          - python-artifacts-ubuntu-latest-3.8
+          - python-artifacts-ubuntu-latest-3.9
+          - python-artifacts-windows-latest-3.8
+          - python-artifacts-windows-latest-3.9
+      deploy_env:
+        description: 'Environment to deploy (development or staging)'
+        required: true
+        type: choice
+        default: 'development'
+        options:
+          - development
+          - staging
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
+  HelmChartName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    name: Python CI (${{ matrix.os }}-${{ matrix.python-version }})
+
     defaults:
       run:
         working-directory: ./src
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -34,8 +66,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
-        run: |
-          python manage.py test
+        run: python manage.py test
 
       - name: Generate Report
         run: |
@@ -43,17 +74,15 @@ jobs:
           coverage report
 
       - name: Linting
-        run: |
-          flake8 . --show-source --statistics --exit-zero
+        run: flake8 . --show-source --statistics --exit-zero
 
       - name: Check Complexity
-        run: |
-          flake8 . --exit-zero --max-complexity=6
+        run: flake8 . --exit-zero --max-complexity=6
 
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.os }}-${{ matrix.python-version }}
           path: .
 
       - name: Upload helm artifacts
@@ -61,26 +90,27 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
-          path: ${{ github.workspace }}/helm-charts
+          path: ./helm-charts/${{ env.HelmChartName }}
 
       - name: Upload kind cluster artifact
         if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
-          path: ${{ github.workspace }}/cluster.yml
+          path: ./cluster.yml
 
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
-    if: ${{ github.ref_name == 'main' }}
+    if: github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
     needs: python-ci
     steps:
 
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        # Умова для завантаження: якщо ручний запуск, використовуємо input; інакше — дефолтний
+        name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.matrix_artifact || 'python-artifacts-ubuntu-latest-3.9' }}
         path: .
 
     - name: Login to Docker Hub
@@ -99,7 +129,7 @@ jobs:
   helm-ci:
     runs-on: ubuntu-latest
     needs: python-ci
-    if: github.ref_name == 'main'
+    if: github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
     name: Helm CI
     steps:
 
@@ -112,13 +142,13 @@ jobs:
       uses: azure/setup-helm@v4.2.0
 
     - name: Lint helm
-      run: helm lint ./todoapp/
+      run: helm lint ./${{ env.HelmChartName }}/
 
     - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      run: helm template ${{ env.HelmChartName }} ./${{ env.HelmChartName }}/ -f ./${{ env.HelmChartName }}/values.yaml
 
     - name: Package Helm
-      run: helm package ./todoapp
+      run: helm package ./${{ env.HelmChartName }}
 
     - name: Upload Helm Artifact
       uses: actions/upload-artifact@v4
@@ -131,6 +161,7 @@ jobs:
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [helm-ci, docker-ci]
     secrets: inherit
+    if: github.event_name == 'push' || github.event.inputs.deploy_env == 'development'
     with:
       environment: development
       version: ${{ github.sha }}
@@ -138,10 +169,11 @@ jobs:
   deploy-helm-stg:
     name: Deploy helm to Staging
     uses: ./.github/workflows/reusable-deployment.yml
-    needs: [deploy-helm-dev]
+    # ОНОВЛЕНО: Тепер залежить від CI/Build, а не від deploy-helm-dev
+    needs: [helm-ci, docker-ci]
     secrets: inherit
+    if: github.event_name == 'push' || github.event.inputs.deploy_env == 'staging'
     with:
       environment: staging
       version: ${{ github.sha }}
-      helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging

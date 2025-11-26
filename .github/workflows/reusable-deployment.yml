@@ -1,5 +1,4 @@
-name: helm-upgrade
-run-name: ${{ github.actor }} - ${{ github.ref_name }}
+name: Reusable Kind Deployment
 
 on:
   workflow_call:
@@ -11,19 +10,32 @@ on:
       version:
         required: true
         type: string
+        # Версія образу, яка передається з github.sha
       helm-values-path:
         type: string
-        default: './todoapp/values.yaml'
+        # Оновлено дефолтний шлях, щоб він відповідав структурі завантажених артефактів
+        default: 'todoapp/values.yaml'
       helm-release-name:
         default: todoapp
         type: string
+    secrets:
+      # Ці секрети потрібні для docker pull
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
 jobs:
     deploy-helm:
-      name: ${{ inputs.environment }}
+      # Змінено назву job для ясності
+      name: Deploy to ${{ inputs.environment }}
       runs-on: ubuntu-latest
       environment: ${{ inputs.environment }}
+      env:
+        DockerImageName: todoapp
 
       steps:
+      # Завантажуємо усі необхідні артефакти
       - uses: actions/download-artifact@v4
         with:
           name: helm-package
@@ -39,6 +51,13 @@ jobs:
           name: kind-cluster
           path: .
 
+      # КРОК 1: Логін, щоб мати можливість витягнути образ
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Set Up Helm
         uses: azure/setup-helm@v4.2.0
 
@@ -50,31 +69,30 @@ jobs:
         with:
           config: ./cluster.yml
 
+      # КРОК 2: Завантаження щойно зібраного образу в Kind кластер
+      - name: Load Docker Image into Kind
+        run: |
+          IMAGE_TAG=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ inputs.version }}
+          docker pull $IMAGE_TAG
+          kind load docker-image $IMAGE_TAG
+
+      # КРОК 3: Dry Run Helm
       - name: Dry Run Helm
         run: |
           helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
           -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }} \
+          --set todoapp.image.tag=${{ inputs.version }} \
+          --namespace ${{ inputs.environment }} --create-namespace # ОНОВЛЕНО
 
-      - name: Deploy helm to Development
+      # КРОК 4: Deploy helm
+      - name: Deploy helm
         run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }} \
+          --set todoapp.image.tag=${{ inputs.version }} \
+          --namespace ${{ inputs.environment }} --create-namespace # ОНОВЛЕНО
 
+      - name: Verify Deployment
+        run: kubectl get pods -n ${{ inputs.environment }} # Додано -n ${{ inputs.environment }} для кращої перевірки
