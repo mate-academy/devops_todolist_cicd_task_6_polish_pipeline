@@ -2,19 +2,48 @@ name: python-deployment
 
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
+concurrency:
+ group: ${{ github.workflow }}-${{ github.ref }}
+ cancel-in-progress: true
+
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target deployment environment"
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+        default: development
+      matrix-artifact:
+        description: "Matrix artefact to use"
+        required: true
+        type: choice
+        options:
+          - python-artifacts-ubuntu-latest-3.8
+          - python-artifacts-ubuntu-latest-3.9
+          - python-artifacts-windows-latest-3.8
+          - python-artifacts-windows-latest-3.9
+        default: 'python-artifacts-ubuntu-latest-3.8'
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
+
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+       PythonVersion: [3.8, 3.9]
+       OsType: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +51,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -53,18 +82,18 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.PythonVersion == 3.8 && matrix.OsType == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.PythonVersion == 3.8 && matrix.OsType == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -73,14 +102,14 @@ jobs:
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
-    if: ${{ github.ref_name == 'main' }}
+    if: github.ref_name == 'main' && github.event_name == 'workflow_dispatch'
     needs: python-ci
     steps:
 
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.matrix-artifact || 'python-artifacts-ubuntu-latest-3.8' }}
         path: .
 
     - name: Login to Docker Hub
@@ -99,7 +128,7 @@ jobs:
   helm-ci:
     runs-on: ubuntu-latest
     needs: python-ci
-    if: github.ref_name == 'main'
+    if: github.ref_name == 'main' && github.event_name == 'workflow_dispatch'
     name: Helm CI
     steps:
 
@@ -137,6 +166,7 @@ jobs:
 
   deploy-helm-stg:
     name: Deploy helm to Staging
+    if: ${{ github.event.inputs.environment == 'staging' }}
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [deploy-helm-dev]
     secrets: inherit
