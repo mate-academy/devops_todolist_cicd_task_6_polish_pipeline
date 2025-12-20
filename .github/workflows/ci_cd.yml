@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       deploy_target:
-        description: "Select artifact to deploy (ubuntu-latest-3.8, windows-latest-3.9, etc.)"
-        required: true
-        default: "ubuntu-latest-3.8"
+        description: "Trigger staging deployment"
+        required: false
+        default: "manual"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -48,7 +48,7 @@ jobs:
       - name: Run tests
         run: pytest
 
-      - name: Upload artifact
+      - name: Upload artifact (optional)
         uses: actions/upload-artifact@v4
         with:
           name: app-${{ matrix.os }}-${{ matrix.python }}
@@ -58,7 +58,8 @@ jobs:
     name: Build & Push Docker image
     needs: python-ci
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # FIX: allow running for workflow_dispatch too
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -96,14 +97,15 @@ jobs:
     steps:
       - name: Deploy to DEV
         run: |
-          echo "Deploying image ${{ needs.docker-ci.outputs.IMAGE }} to DEVELOPMENT"
+          echo "Deploying image to DEVELOPMENT:"
+          echo "Image: ${{ needs.docker-ci.outputs.IMAGE }}"
           echo "DEV_APP_ENV=${{ secrets.DEV_APP_ENV }}"
           echo "DEV_DUMMY_SECRET=${{ secrets.DEV_DUMMY_SECRET }}"
-          # your real deploy to DEV goes here
+          # your real dev deploy goes here
 
   deploy-staging:
     name: Deploy to Staging
-    needs: [python-ci, docker-ci]
+    needs: docker-ci
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
 
@@ -111,15 +113,10 @@ jobs:
       name: staging
 
     steps:
-      - name: Download selected artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-${{ github.event.inputs.deploy_target }}
-
       - name: Deploy to STAGING
         run: |
-          echo "Deploying artifact ${{ github.event.inputs.deploy_target }} to STAGING"
-          echo "Using Docker image: ${{ needs.docker-ci.outputs.IMAGE }}"
+          echo "Manual deployment to STAGING:"
+          echo "Image: ${{ needs.docker-ci.outputs.IMAGE }}"
           echo "STAGING_APP_ENV=${{ secrets.STAGING_APP_ENV }}"
           echo "STAGING_DUMMY_SECRET=${{ secrets.STAGING_DUMMY_SECRET }}"
-          # your real deploy to STAGING goes here
+          # your real staging deploy goes here
