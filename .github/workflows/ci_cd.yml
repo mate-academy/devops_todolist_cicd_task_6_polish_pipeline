@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r src/requirements.txt
 
       - name: Run tests
         run: pytest
@@ -99,7 +99,7 @@ jobs:
           echo "Deploying image ${{ needs.docker-ci.outputs.IMAGE }} to DEVELOPMENT"
           echo "DEV_APP_ENV=${{ secrets.DEV_APP_ENV }}"
           echo "DEV_DUMMY_SECRET=${{ secrets.DEV_DUMMY_SECRET }}"
-          # тут має бути твій реальний деплой (kubectl/helm/ssh)
+          # your real deploy to DEV goes here
 
   deploy-staging:
     name: Deploy to Staging
@@ -122,4 +122,4 @@ jobs:
           echo "Using Docker image: ${{ needs.docker-ci.outputs.IMAGE }}"
           echo "STAGING_APP_ENV=${{ secrets.STAGING_APP_ENV }}"
           echo "STAGING_DUMMY_SECRET=${{ secrets.STAGING_DUMMY_SECRET }}"
-          # твій staging deploy тут
+          # your real deploy to STAGING goes here
