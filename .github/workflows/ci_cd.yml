@@ -1,0 +1,126 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Select artifact to deploy (e.g., ubuntu-latest-3.8)"
+        required: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
+
+jobs:
+
+  python-ci:
+    name: Python CI - ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.8", "3.9"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/requirements.txt
+
+      - name: Run tests
+        run: pytest
+
+      - name: Upload artifact from matrix build
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}-${{ matrix.python }}
+          path: .
+
+  docker-ci:
+    name: Build & Push Docker image
+    needs: python-ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push image
+        id: docker_build
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          IMAGE=${{ env.DOCKER_IMAGE_NAME }}:$IMAGE_TAG
+
+          echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
+
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+    outputs:
+      IMAGE: ${{ steps.docker_build.outputs.IMAGE }}
+
+  deploy-dev:
+    name: Deploy to Development
+    needs: docker-ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    environment:
+      name: development
+
+    steps:
+      - name: Deploy to DEV
+        run: |
+          echo "Deploying image to DEVELOPMENT:"
+          echo "Image: ${{ needs.docker-ci.outputs.IMAGE }}"
+          echo "DEV_APP_ENV=${{ secrets.DEV_APP_ENV }}"
+          echo "DEV_DUMMY_SECRET=${{ secrets.DEV_DUMMY_SECRET }}"
+          # your real dev deploy goes here
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: python-ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    environment:
+      name: staging
+
+    steps:
+      - name: Download selected artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: app-${{ github.event.inputs.deploy_target }}
+
+      - name: Deploy to STAGING
+        run: |
+          echo "Deploying artifact: ${{ github.event.inputs.deploy_target }} to STAGING"
+          echo "Listing artifact contents:"
+          ls -la
+          echo "STAGING_APP_ENV=${{ secrets.STAGING_APP_ENV }}"
+          echo "STAGING_DUMMY_SECRET=${{ secrets.STAGING_DUMMY_SECRET }}"
+          # your staging deployment logic here
