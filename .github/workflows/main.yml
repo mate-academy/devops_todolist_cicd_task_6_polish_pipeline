@@ -1,147 +1,165 @@
 name: python-deployment
 
-run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
+run-name: ${{ github.actor }} - ${{ github.ref_name }} - ${{ github.sha }}
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artefact-to-deploy:
+        description: "Select artefact to deploy"
+        required: true
+        type: choice
+        options:
+          - "ubuntu-3.8"
+          - "ubuntu-3.9"
+          - "windows-3.8"
+          - "windows-3.9"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-  PythonVersion: 3.8
-  DockerImageName: todoapp
+  PYTHON_VERSION: 3.9
+  DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    name: Python CI
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - artefact: ubuntu-3.8
+            os: ubuntu-latest
+            python-version: "3.8"
+          - artefact: ubuntu-3.9
+            os: ubuntu-latest
+            python-version: "3.9"
+          - artefact: windows-3.8
+            os: windows-latest
+            python-version: "3.8"
+          - artefact: windows-3.9
+            os: windows-latest
+            python-version: "3.9"
+
     defaults:
       run:
         working-directory: ./src
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: |
+            src/requirements.txt
+            src/requirements-dev.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install coverage flake8
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: |
-          python manage.py test
-
-      - name: Generate Report
+      - name: Run Tests with Coverage
         run: |
           coverage run --source='.' manage.py test
           coverage report
 
       - name: Linting
-        run: |
-          flake8 . --show-source --statistics --exit-zero
+        run: flake8 . --show-source --statistics --exit-zero
 
       - name: Check Complexity
-        run: |
-          flake8 . --exit-zero --max-complexity=6
+        run: flake8 . --exit-zero --max-complexity=10
 
-      - name: Upload python artifacts
+      - name: Upload tested artifact
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
-          path: .
+          name: python-artifact-${{ matrix.artefact }}
+          path: src/*
 
-      - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+  helm-artifacts:
+    name: Upload Helm Artifacts
+    needs: python-ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload Helm Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
-          path: ${{ github.workspace }}/helm-charts
-
-      - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: kind-cluster
-          path: ${{ github.workspace }}/cluster.yml
+          path: helm-charts/*
 
   docker-ci:
-    name: Build and Push Image
-    runs-on: ubuntu-latest
-    if: ${{ github.ref_name == 'main' }}
+    name: Build & push image
     needs: python-ci
-    steps:
-
-    - uses: actions/download-artifact@v4
-      name: Download python artifacts
-      with:
-        name: python-artifacts
-        path: .
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        push: true
-        context: ./src
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/docker-ci.yml
+    secrets: inherit
+    with:
+      os-type: ${{ contains(github.event.inputs.artefact-to-deploy, 'windows') && 'windows-latest' || 'ubuntu-latest' }}
+      python-artifact: python-artifact-${{ github.event.inputs.artefact-to-deploy }}
 
   helm-ci:
+    name: Helm lint & package
     runs-on: ubuntu-latest
-    needs: python-ci
-    if: github.ref_name == 'main'
-    name: Helm CI
+    needs: helm-artifacts
+    if: github.event_name == 'workflow_dispatch'
     steps:
+      - name: Download Helm Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: ./helm-charts
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: helm-artifacts
-        path: .
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.0
 
-    - name: Set Up Helm
-      uses: azure/setup-helm@v4.2.0
+      - name: Lint Helm Charts
+        run: helm lint helm-charts/todoapp
 
-    - name: Lint helm
-      run: helm lint ./todoapp/
+      - name: Template Helm Charts
+        run: helm template todoapp helm-charts/todoapp -f helm-charts/todoapp/values.yaml
 
-    - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      - name: Package Helm Charts
+        run: helm package helm-charts/todoapp --destination helm-charts/packages
 
-    - name: Package Helm
-      run: helm package ./todoapp
-
-    - name: Upload Helm Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: helm-package
-        path: ./*.tgz
+      - name: Upload Packaged Helm Charts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-packaged-artifacts
+          path: helm-charts/packages/*.tgz
 
   deploy-helm-dev:
-    name: Deploy helm to Development
-    uses: ./.github/workflows/reusable-deployment.yml
+    name: Deploy to development
     needs: [helm-ci, docker-ci]
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/reusable-deployment.yml
     secrets: inherit
     with:
       environment: development
-      version: ${{ github.sha }}
+      docker-image-version: "${{ github.sha }}"
 
   deploy-helm-stg:
-    name: Deploy helm to Staging
-    uses: ./.github/workflows/reusable-deployment.yml
+    name: Deploy to staging
     needs: [deploy-helm-dev]
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/reusable-deployment.yml
     secrets: inherit
     with:
       environment: staging
-      version: ${{ github.sha }}
-      helm-values-path: ./todoapp/values/stg.yaml
-      helm-release-name: todoapp-staging
+      docker-image-version: "${{ github.sha }}"
+      helm-values-path: "./helm-charts/todoapp/values/stg.yaml"

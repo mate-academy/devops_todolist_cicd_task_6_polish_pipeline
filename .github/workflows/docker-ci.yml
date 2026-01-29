@@ -1,0 +1,41 @@
+name: Docker Build & Push
+run-name: Build & push todoapp for ${{ inputs.os-type }}
+
+on:
+  workflow_call:
+    inputs:
+      os-type:
+        description: "Operating system type for the docker image"
+        required: true
+        type: string
+      python-artifact:
+        description: "Python artefact to build the docker image"
+        required: true
+        type: string
+
+env:
+  DOCKER_IMAGE_NAME: todoapp
+
+jobs:
+  docker-ci:
+    name: Build & push image
+    runs-on: ${{ inputs.os-type }}
+    steps:
+      - name: Download python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.python-artifact }}
+          path: ./app
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}

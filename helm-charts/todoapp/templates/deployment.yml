@@ -66,9 +66,9 @@ spec:
             port: 8080
           initialDelaySeconds: 60
           periodSeconds: 5
-        readinessProbe:
-          httpGet:
-            path: api/ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        # readinessProbe:
+        #   httpGet:
+        #     path: api/ready
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5

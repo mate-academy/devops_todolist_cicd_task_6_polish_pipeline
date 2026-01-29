@@ -1,80 +1,80 @@
-name: helm-upgrade
-run-name: ${{ github.actor }} - ${{ github.ref_name }}
+name: Helm Deploy
+run-name: Deploy to ${{ inputs.environment }}
 
 on:
   workflow_call:
     inputs:
       environment:
+        description: "Target environment for deployment"
         required: true
-        description: 'Environment to deploy to'
         type: string
-      version:
+      docker-image-version:
+        description: "Docker image version to deploy"
         required: true
         type: string
       helm-values-path:
+        description: "Path to Helm values file"
+        required: false
         type: string
-        default: './todoapp/values.yaml'
-      helm-release-name:
-        default: todoapp
+        default: "./helm-charts/todoapp/values.yaml"
+      cluster-config-path:
+        description: "Path to kind cluster config file"
+        required: false
         type: string
+        default: "cluster.yml"
+
+env:
+  HELM_RELEASE_NAME: todoapp
+  KIND_CLUSTER_NAME: todoapp-cluster
+  CHART_PKG_PATH: ./helm-charts/packages
+  DOCKER_IMAGE_NAME: todoapp
+
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-helm:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
-      - uses: actions/download-artifact@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Packaged Helm Charts
+        uses: actions/download-artifact@v4
         with:
-          name: helm-package
-          path: .
+          name: helm-packaged-artifacts
+          path: ${{ env.CHART_PKG_PATH }}
 
-      - uses: actions/download-artifact@v4
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.10.0
         with:
-          name: helm-artifacts
-          path: .
+          config: ${{ inputs.cluster-config-path }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: kind-cluster
-          path: .
-
-      - name: Set Up Helm
-        uses: azure/setup-helm@v4.2.0
-
-      - name: Set up Kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          config: ./cluster.yml
-
-      - name: Dry Run Helm
+      - name: Dry-run Helm install
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          helm install --dry-run ${{ env.HELM_RELEASE_NAME }} \
+            ${{ env.CHART_PKG_PATH }}/todoapp-*.tgz
 
-      - name: Deploy helm to Development
+      - name: Deploy Helm Chart
+        env:
+          DOCKER_IMAGE_REPO: "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
+            ${{ env.CHART_PKG_PATH }}/todoapp-*.tgz \
+            --namespace ${{ inputs.environment }} \
+            --create-namespace \
+            --atomic \
+            --wait \
+            --timeout 300s \
+            -f ${{ inputs.helm-values-path }} \
+            --set todoapp.secrets.SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            --set todoapp.secrets.DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+            --set todoapp.secrets.DB_USER="${{ secrets.DB_USER }}" \
+            --set todoapp.secrets.DB_NAME="${{ secrets.DB_NAME }}" \
+            --set todoapp.secrets.DB_HOST="${{ secrets.DB_HOST }}" \
+            --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+            --set mysql.secrets.MYSQL_USER="${{ secrets.DB_USER }}" \
+            --set todoapp.image.repository="${{ env.DOCKER_IMAGE_REPO }}" \
+            --set todoapp.image.tag="${{ inputs.docker-image-version }}"
