@@ -31,12 +31,12 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: ${{ github.event.inputs.environment || 'ubuntu-latest-3.8' }}-helm-artifacts
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: ${{ github.event.inputs.environment || 'ubuntu-latest-3.8' }}-kind-cluster-artifact
           path: .
 
       - name: Set Up Helm
@@ -66,7 +66,7 @@ jobs:
 
       - name: Deploy helm to Development
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+          helm upgrade --install --wait --timeout 280s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
@@ -77,4 +77,12 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
+
+      - name: Debug Kubernetes Failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl get events -A --sort-by='.lastTimestamp'
+          kubectl logs -l app=mysql -n mysql --tail=50
+          kubectl logs -l app=todoapp -n todoapp --tail=50
 

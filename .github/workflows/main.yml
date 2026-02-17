@@ -7,14 +7,33 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Artifact to use for deployment"
+        required: true
+        type: choice
+        options: ["ubuntu-latest-3.8", "windows-latest-3.8", "ubuntu-latest-3.9", "windows-latest-3.9"]
+      message:
+        description: "Message to include in the deployment"
+        required: false
+        type: string
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: ['3.8', '3.9']
+        OsType: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +41,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -53,21 +72,19 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: ${{ matrix.OsType }}-${{ matrix.PythonVersion }}-python-artifact
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: helm-artifacts
+          name: ${{ matrix.OsType }}-${{ matrix.PythonVersion }}-helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: kind-cluster
+          name: ${{ matrix.OsType }}-${{ matrix.PythonVersion }}-kind-cluster-artifact
           path: ${{ github.workspace }}/cluster.yml
 
   docker-ci:
@@ -80,7 +97,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: ${{ github.event.inputs.environment || 'ubuntu-latest-3.8' }}-python-artifact
         path: .
 
     - name: Login to Docker Hub
@@ -105,7 +122,7 @@ jobs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: helm-artifacts
+        name: ${{ github.event.inputs.environment || 'ubuntu-latest-3.8' }}-helm-artifacts
         path: .
 
     - name: Set Up Helm
