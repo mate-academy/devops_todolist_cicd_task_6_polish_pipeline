@@ -7,6 +7,17 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact-to-deploy:
+        description: "K8S artifact to deploy"
+        required: true
+        type: choice
+        options: ['ubuntu-3.8', 'ubuntu-3.9', 'windows-3.8', 'windows-3.9']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
@@ -14,7 +25,12 @@ env:
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+        os-type: ['ubuntu-latest']
+
+    runs-on: ${{ matrix.os-type }}
     defaults:
       run:
         working-directory: ./src
@@ -25,7 +41,7 @@ jobs:
       - name: Set up Python ${{ env.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
