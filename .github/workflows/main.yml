@@ -27,7 +27,7 @@ jobs:
   python-ci:
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: ['3.8', '3.9']
         os-type: ['ubuntu-latest']
 
     runs-on: ${{ matrix.os-type }}
