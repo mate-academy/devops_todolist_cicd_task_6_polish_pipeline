@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.8', '3.9']
-        os-type: ['ubuntu-latest']
+        os-type: ['ubuntu-latest', 'windows-latest']
 
     runs-on: ${{ matrix.os-type }}
     defaults:
