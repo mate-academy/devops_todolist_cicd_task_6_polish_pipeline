@@ -2,19 +2,50 @@ name: python-deployment
 
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Select artifact to deploy'
+        required: true
+        type: choice
+        options:
+          - ubuntu-3.8
+          - ubuntu-3.9
+          - windows-3.8
+          - windows-3.9
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    name: Python CI
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.8'
+            name: ubuntu-3.8
+          - os: ubuntu-latest
+            python: '3.9'
+            name: ubuntu-3.9
+          - os: windows-latest
+            python: '3.8'
+            name: windows-3.8
+          - os: windows-latest
+            python: '3.9'
+            name: windows-3.9
+    if: github.event_name != 'workflow_dispatch' || matrix.name == github.event.inputs.artifact
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +53,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |
