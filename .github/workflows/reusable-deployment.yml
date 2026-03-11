@@ -17,13 +17,19 @@ on:
       helm-release-name:
         default: todoapp
         type: string
+      image-repository:
+        required: true
+        type: string
+      selected-artifact:
+        required: true
+        type: string
 jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+  deploy-helm:
+    name: ${{ inputs.environment }} (${{ inputs.selected-artifact }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-      steps:
+    steps:
       - uses: actions/download-artifact@v4
         with:
           name: helm-package
@@ -62,9 +68,10 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ inputs.image-repository }} \
+          --set todoapp.image.tag=${{ inputs.version }}
 
-      - name: Deploy helm to Development
+      - name: Deploy Helm release
         run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
@@ -76,5 +83,5 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          --set todoapp.image.repository=${{ inputs.image-repository }} \
+          --set todoapp.image.tag=${{ inputs.version }}
