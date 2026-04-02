@@ -11,6 +11,12 @@ on:
       version:
         required: true
         type: string
+      OsType:
+        type: string
+        default: ubuntu-latest
+      PythonVersion:
+        type: string
+        default: '3.9'
       helm-values-path:
         type: string
         default: './todoapp/values.yaml'
@@ -26,17 +32,17 @@ jobs:
       steps:
       - uses: actions/download-artifact@v4
         with:
-          name: helm-package
+          name: helm-package-${{ inputs.OsType }}-${{ inputs.PythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.OsType }}-${{ inputs.PythonVersion }}
           path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: kind-cluster
+          name: kind-cluster-${{ inputs.OsType }}-${{ inputs.PythonVersion }}
           path: .
 
       - name: Set Up Helm
@@ -77,4 +83,3 @@ jobs:
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
           --set todoapp.image.tag=${{ github.sha }}
-
