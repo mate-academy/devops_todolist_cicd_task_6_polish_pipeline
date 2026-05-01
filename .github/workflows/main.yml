@@ -7,14 +7,41 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        description: 'Environment to deploy to'
+        type: choice
+        options:
+          - development
+          - staging
+      artifact_name:
+        required: true
+        description: 'Name of the artifact to deploy'
+        type: choice
+        default: ubuntu-latest-3.9
+        options:
+          - windows-latest-3.8
+          - windows-latest-3.9
+          - ubuntu-latest-3.8
+          - ubuntu-latest-3.9
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+          PythonVersion: [3.8, 3.9]
+          OsType: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +49,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -53,7 +80,7 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: ${{matrix.OsType}}-${{matrix.PythonVersion}}
           path: .
 
       - name: Upload helm artifacts
@@ -80,7 +107,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: ${{ inputs.artifact_name || 'ubuntu-latest-3.9' }} 
         path: .
 
     - name: Login to Docker Hub
