@@ -1,0 +1,18 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  jobs:
+    container-job-test:
+      runs-on: ubuntu-latest
+      container: 'node18'
+      env:
+        Node_ENV: deployment
+      ports:
+        - 80
+      volumes:
+        - my_docker_volume:/volume_mount
+      options: --cpus 1
+    steps:
+      - name: Check docker env file
+        runs: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
