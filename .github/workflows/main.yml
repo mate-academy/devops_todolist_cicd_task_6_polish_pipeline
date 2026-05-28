@@ -13,11 +13,21 @@ on:
         description: "Environment deply to"
         required: true
         type: choice
-        options: ['dev','staging','production']
+        options: [ 'dev','staging','production' ]
+      matrix_artifact:
+        description: "OS-Python combination to deploy"
+        required: true
+        type: choice
+        options:
+          - ubuntu-3.8
+          - ubuntu-3.9
+          - windows-3.8
+          - windows-3.9
       message:
         description: 'test me'
         required: false
         type: string
+
 
 
 concurrency:
@@ -157,8 +167,14 @@ jobs:
   deploy-helm-stg:
     name: Deploy helm to Staging
     uses: ./.github/workflows/reusable-deployment.yml
-    needs: [deploy-helm-dev]
+    needs: [ deploy-helm-dev ]
     secrets: inherit
+    environment:
+      name: staging
+      url: https://staging.example.com
+      required_reviewers:
+        - reviewer1
+        - reviewer2
     with:
       environment: staging
       version: ${{ github.sha }}
