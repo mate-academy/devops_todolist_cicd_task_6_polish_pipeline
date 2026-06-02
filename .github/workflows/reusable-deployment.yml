@@ -11,6 +11,9 @@ on:
       version:
         required: true
         type: string
+      artifact-name:
+        required: true
+        type: string
       helm-values-path:
         type: string
         default: './todoapp/values.yaml'
@@ -28,6 +31,11 @@ jobs:
         with:
           name: helm-package
           path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: python-artifact/
 
       - uses: actions/download-artifact@v4
         with:
@@ -66,7 +74,7 @@ jobs:
 
       - name: Deploy helm to Development
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+          helm upgrade --install --wait --timeout 180s --debug --atomic ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
