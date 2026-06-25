@@ -2,11 +2,30 @@ name: python-deployment
 
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
+
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact_os:
+        description: "Which OS to deploy"
+        required: true
+        default: "ubuntu-latest"
+        type: choice
+        options: ["ubuntu-latest", "windows-latest"]
+      artifact_python:
+        description: "Which python version to deploy"
+        required: true
+        default: "3.8"
+        type: choice
+        options: ["3.8", "3.9"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
@@ -14,7 +33,12 @@ env:
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        osType: [ubuntu-latest, windows-latest]
+    name: Python CI
+    runs-on: ${{ matrix.osType }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +46,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -53,7 +77,7 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.osType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
@@ -80,7 +104,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ github.event.inputs.artifact_os || 'ubuntu-latest' }}-${{ github.event.inputs.artifact_python || '3.8' }}
         path: .
 
     - name: Login to Docker Hub
