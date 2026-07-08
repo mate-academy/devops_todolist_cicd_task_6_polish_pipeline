@@ -7,14 +7,44 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      python-version:
+        type: choice
+        options: [3.8, 3.9]
+      OsType:
+        type: choice
+        options: [ubuntu, windows]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
-  python-ci:
+  matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo 'matrix={"python-version":["${{ github.event.inputs.python-version }}"],"OsType":["${{ github.event.inputs.OsType }}-latest"]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"python-version":["3.8","3.9"],"OsType":["ubuntu-latest","windows-latest"]}' >> $GITHUB_OUTPUT
+          fi
+
+  python-ci:
+    needs: matrix
+    strategy:
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+        
+    runs-on: ${{ matrix.OsType }}
+    name: Python CI
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +52,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -53,7 +83,7 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.python-version }}
           path: .
 
       - name: Upload helm artifacts
@@ -80,7 +110,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ matrix.OsType }}-${{ matrix.python-version }}
         path: .
 
     - name: Login to Docker Hub
