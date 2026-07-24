@@ -179,18 +179,25 @@ jobs:
 
   deploy-staging:
     name: Deploy Staging
-    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
     needs: deploy-dev
+    environment: staging
 
-    uses: ./.github/workflows/reusable-deployment.yml
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-package
+          path: .
 
-    secrets: inherit
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
 
-    with:
-      environment: staging
-      version: ${{ github.sha }}
-      helm-values-path: ./todoapp/values/stg.yaml
-      helm-release-name: todoapp-staging
+      - uses: actions/download-artifact@v4
+        with:
+          name: kind-cluster
+          path: .
 
   manual-deploy:
     name: Manual Artifact Deployment
