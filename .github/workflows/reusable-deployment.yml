@@ -62,6 +62,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
@@ -73,8 +74,9 @@ jobs:
           --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
           --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.APP_DB_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.APP_DB_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
           --set todoapp.image.tag=${{ github.sha }}
 
