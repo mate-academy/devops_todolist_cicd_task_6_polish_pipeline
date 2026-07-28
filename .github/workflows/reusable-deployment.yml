@@ -11,6 +11,9 @@ on:
       version:
         required: true
         type: string
+      docker-image-name:
+        required: true
+        type: string
       helm-values-path:
         type: string
         default: './todoapp/values.yaml'
@@ -62,6 +65,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.docker-image-name }}" \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
@@ -76,5 +80,6 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.docker-image-name }}" \
           --set todoapp.image.tag=${{ github.sha }}
 
