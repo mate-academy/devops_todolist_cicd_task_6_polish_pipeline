@@ -62,11 +62,12 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
           --set todoapp.image.tag=${{ github.sha }}
 
       - name: Deploy helm to Development
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+          helm upgrade --install --wait --timeout 300s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
@@ -76,5 +77,13 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
           --set todoapp.image.tag=${{ github.sha }}
 
+      - name: Debug Kubernetes Pods on Failure
+        if: failure()
+        run: |
+          kubectl get pods -n todoapp
+          kubectl get pods -n mysql
+          kubectl describe pods -n todoapp
+          kubectl logs -n todoapp -l app.kubernetes.io/name=todoapp --tail=50
