@@ -2,21 +2,43 @@ name: helm-upgrade
 run-name: ${{ github.actor }} - ${{ github.ref_name }}
 
 on:
-  workflow_call:
+
+  workflow_dispatch:
     inputs:
       environment:
         required: true
         description: 'Environment to deploy to'
+        type: choice
+        options: ["dev", "staging", "prod"]
+      message:
+        description: "Test Message"
+        required: false
         type: string
-      version:
-        required: true
-        type: string
-      helm-values-path:
-        type: string
-        default: './todoapp/values.yaml'
-      helm-release-name:
-        default: todoapp
-        type: string
+      artifact:
+            required: true
+            type: string
+
+
+
+  workflow_call:
+        inputs:
+            environment:
+                required: true
+                type: string
+            version:
+                required: true
+                type: string
+            artifact:
+                required: true
+                type: string
+            helm-values-path:
+                required: false
+                type: string
+                default: ./helm-charts/todoapp/values.yaml
+            helm-release-name:
+                required: false
+                type: string
+                default: todoapp
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
@@ -24,14 +46,10 @@ jobs:
       environment: ${{ inputs.environment }}
 
       steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: helm-package
-          path: .
 
       - uses: actions/download-artifact@v4
         with:
-          name: helm-artifacts
+          name: helm-artifacts-${{ inputs.artifact }}
           path: .
 
       - uses: actions/download-artifact@v4
@@ -62,7 +80,7 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
 
       - name: Deploy helm to Development
         run: |
@@ -76,5 +94,5 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
 
