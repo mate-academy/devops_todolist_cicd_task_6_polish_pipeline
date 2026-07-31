@@ -2,6 +2,19 @@ name: helm-upgrade
 run-name: ${{ github.actor }} - ${{ github.ref_name }}
 
 on:
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        description: 'Environment to deploy to'
+        type: choice
+        options: ["dev", "staging", "prod"]
+      message:
+        description: "Test Message"
+        required: false
+        type: string
+
   workflow_call:
     inputs:
       environment:
