@@ -17,13 +17,14 @@ on:
       helm-release-name:
         default: todoapp
         type: string
-jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
 
-      steps:
+jobs:
+  deploy-helm:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
       - uses: actions/download-artifact@v4
         with:
           name: helm-package
@@ -52,29 +53,32 @@ jobs:
 
       - name: Dry Run Helm
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+            -f ${{ inputs.helm-values-path }} \
+            --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+            --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+            --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+            --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+            --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+            --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+            --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+            --set todoapp.hpa.minReplicas=1 \
+            --set mysql.resources.requests.memory=512Mi \
+            --set mysql.resources.limits.memory=512Mi
 
-      - name: Deploy helm to Development
+      - name: Deploy helm atomic
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          helm upgrade --install --atomic --wait --timeout 15m --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
+            -f ${{ inputs.helm-values-path }} \
+            --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+            --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+            --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+            --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+            --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+            --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+            --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+            --set todoapp.hpa.minReplicas=1 \
+            --set mysql.resources.requests.memory=512Mi \
+            --set mysql.resources.limits.memory=512Mi

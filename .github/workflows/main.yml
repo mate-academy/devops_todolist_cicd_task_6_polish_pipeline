@@ -7,14 +7,35 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: Artifact from the test matrix to deploy
+        required: true
+        type: choice
+        default: ubuntu-latest-3.8
+        options:
+          - ubuntu-latest-3.8
+          - ubuntu-latest-3.9
+          - windows-latest-3.8
+          - windows-latest-3.9
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
-  PythonVersion: 3.8
-  DockerImageName: todoapp
+  DockerImageName: todolist
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    name: python-ci-${{ matrix.os }}-${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9"]
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +43,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -53,81 +74,94 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.os }}-${{ matrix.python-version }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8' && (github.ref_name == 'main' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.8' && (github.ref_name == 'main' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
           path: ${{ github.workspace }}/cluster.yml
 
+  python-ci-status:
+    name: Python CI
+    runs-on: ubuntu-latest
+    needs: python-ci
+    if: always()
+    steps:
+      - name: Check matrix result
+        run: |
+          if [ "${{ needs.python-ci.result }}" != "success" ]; then
+            echo "python-ci matrix failed: ${{ needs.python-ci.result }}"
+            exit 1
+          fi
+          echo "All python-ci matrix jobs passed"
+
   docker-ci:
     name: Build and Push Image
     runs-on: ubuntu-latest
-    if: ${{ github.ref_name == 'main' }}
-    needs: python-ci
+    if: ${{ github.ref_name == 'main' || github.event_name == 'workflow_dispatch' }}
+    needs: python-ci-status
     steps:
+      - uses: actions/download-artifact@v4
+        name: Download python artifacts
+        with:
+          name: python-artifacts-${{ github.event_name == 'workflow_dispatch' && inputs.artifact || 'ubuntu-latest-3.8' }}
+          path: .
 
-    - uses: actions/download-artifact@v4
-      name: Download python artifacts
-      with:
-        name: python-artifacts
-        path: .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        push: true
-        context: ./src
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: ./src
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
     runs-on: ubuntu-latest
-    needs: python-ci
-    if: github.ref_name == 'main'
+    needs: python-ci-status
+    if: ${{ github.ref_name == 'main' || github.event_name == 'workflow_dispatch' }}
     name: Helm CI
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: helm-artifacts
-        path: .
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
 
-    - name: Set Up Helm
-      uses: azure/setup-helm@v4.2.0
+      - name: Lint helm
+        run: helm lint ./todoapp/
 
-    - name: Lint helm
-      run: helm lint ./todoapp/
+      - name: Template Helm
+        run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
 
-    - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      - name: Package Helm
+        run: helm package ./todoapp
 
-    - name: Package Helm
-      run: helm package ./todoapp
-
-    - name: Upload Helm Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: helm-package
-        path: ./*.tgz
+      - name: Upload Helm Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-package
+          path: ./*.tgz
 
   deploy-helm-dev:
     name: Deploy helm to Development
+    if: ${{ github.ref_name == 'main' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [helm-ci, docker-ci]
     secrets: inherit
@@ -137,6 +171,7 @@ jobs:
 
   deploy-helm-stg:
     name: Deploy helm to Staging
+    if: ${{ github.ref_name == 'main' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/reusable-deployment.yml
     needs: [deploy-helm-dev]
     secrets: inherit
