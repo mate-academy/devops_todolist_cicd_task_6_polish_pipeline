@@ -7,6 +7,21 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options: ['ubuntu-3.8', 'windows-3.8', 'ubuntu-3.9', 'windows-3.9']
+      message:
+        description: 'Message to include in the deployment'
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
@@ -14,6 +29,13 @@ env:
 
 jobs:
   python-ci:
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+
+  python-ci:
+    name: Python CI
     runs-on: ubuntu-latest
     defaults:
       run:
