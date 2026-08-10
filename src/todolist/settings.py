@@ -77,7 +77,6 @@ DATABASES = {
         'PORT': '',  # Leave this empty to use the default MySQL port (3306).
     }
 }
-
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
 
