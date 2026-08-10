@@ -20,7 +20,7 @@ on:
 jobs:
     deploy-helm:
       name: ${{ inputs.environment }}
-      runs-on: ${{ matrix.OsType }}
+      runs-on: ubuntu-latest
       environment: ${{ inputs.environment }}
 
       steps:
