@@ -6,7 +6,6 @@ on:
     inputs:
       environment:
         required: true
-        description: 'Environment to deploy to'
         type: string
       version:
         required: true
@@ -17,13 +16,17 @@ on:
       helm-release-name:
         default: todoapp
         type: string
-jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
 
-      steps:
+jobs:
+  deploy-helm:
+    runs-on: ubuntu-latest
+    # Це поле підхоплює protection rules (required reviewers), налаштовані
+    # в Settings → Environments → {development|staging} у батьківському репозиторії.
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://github.com/${{ github.repository }}/deployments
+
+    steps:
       - uses: actions/download-artifact@v4
         with:
           name: helm-package
@@ -39,20 +42,15 @@ jobs:
           name: kind-cluster
           path: .
 
-      - name: Set Up Helm
-        uses: azure/setup-helm@v4.2.0
+      - uses: azure/setup-helm@v4.2.0
+      - uses: azure/setup-kubectl@v4
 
-      - name: Set up Kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
+      - uses: helm/kind-action@v1
         with:
           config: ./cluster.yml
 
-      - name: Dry Run Helm
-        run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
+      - run: |
+          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
           --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
@@ -62,10 +60,9 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.tag=${{ inputs.version }}
 
-      - name: Deploy helm to Development
-        run: |
+      - run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
           --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
@@ -76,5 +73,4 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          --set todoapp.image.tag=${{ inputs.version }}
