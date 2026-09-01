@@ -7,6 +7,22 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      OsType:
+        description: 'OS type for generating the artifact'
+        required: true
+        type: choice
+        options: [windows-latest, ubuntu-latest]
+      version:
+          description: 'python version for generating the artifact'
+          required: true
+          type: choice
+          options: [3.8, 3.9]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
@@ -14,10 +30,18 @@ env:
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    name: python-ci
+
+    strategy:
+      matrix:
+        PythonVersion: [3.8, 3.9]
+        OsType: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.OsType }}
     defaults:
       run:
         working-directory: ./src
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +49,7 @@ jobs:
       - name: Set up Python ${{ env.PythonVersion }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.PythonVersion }}
 
       - name: Install dependencies
         run: |
@@ -53,7 +77,7 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
@@ -80,7 +104,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ inputs.OsType }}-${{ inputs.version }}
         path: .
 
     - name: Login to Docker Hub
