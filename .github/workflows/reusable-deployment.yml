@@ -1,4 +1,4 @@
-name: helm-upgrade
+name: reusable-helm-deployment
 run-name: ${{ github.actor }} - ${{ github.ref_name }}
 
 on:
