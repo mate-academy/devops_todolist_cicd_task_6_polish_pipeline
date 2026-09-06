@@ -3,18 +3,39 @@ name: python-deployment
 run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
 
 on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Artifact to deploy'
+        required: true
+        type: choice
+        options:
+          - ubuntu-3.8
+          - ubuntu-3.9
+          - windows-3.8
+          - windows-3.9
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
+  PrimaryOs: ubuntu-latest
+  PrimaryPythonVersion: "3.8"
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +43,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -53,18 +74,18 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.os }}-${{ matrix.python-version }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == env.PrimaryOs && matrix.python-version == env.PrimaryPythonVersion
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == env.PrimaryOs && matrix.python-version == env.PrimaryPythonVersion
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -80,7 +101,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ env.PrimaryOs }}-${{ env.PrimaryPythonVersion }}
         path: .
 
     - name: Login to Docker Hub
