@@ -26,15 +26,17 @@ concurrency:
 
 env:
   PythonVersion: 3.8
+  OsType: ubuntu
   DockerImageName: todoapp
 
 jobs:
   python-ci:
+    name: Python CI
     strategy:
       matrix:
         PythonVersion: [3.8, 3.9]
-        OsType: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.OsType }}
+        OsType: [ubuntu, windows]
+    runs-on: ${{ matrix.OsType }}-latest
     defaults:
       run:
         working-directory: ./src
@@ -73,18 +75,18 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: python-artifacts-${{ matrix.OsType }}-${{ matrix.PythonVersion }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.OsType == env.OsType && matrix.PythonVersion == env.PythonVersion
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.OsType == env.OsType && matrix.PythonVersion == env.PythonVersion
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -100,7 +102,7 @@ jobs:
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: python-artifacts-${{ inputs.deploy_artifacts || 'ubuntu-3.9' }}
         path: .
 
     - name: Login to Docker Hub
