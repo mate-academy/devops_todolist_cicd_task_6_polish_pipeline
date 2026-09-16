@@ -4,7 +4,8 @@ mysql:
 todoapp:
   namespace: todoapp
   image:
-    repository: ikulyk404/todoapp
+    repository: ""
+    tag: ""
 
   resources:
     requests:

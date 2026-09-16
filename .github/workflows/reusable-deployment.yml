@@ -62,9 +62,10 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/todoapp \
+          --set todoapp.image.tag=${{ inputs.version }}
 
-      - name: Deploy helm to Development
+      - name: Deploy helm
         run: |
           helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
           -f ${{ inputs.helm-values-path }} \
@@ -76,5 +77,6 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository=${{ secrets.DOCKERHUB_USERNAME }}/todoapp \
+          --set todoapp.image.tag=${{ inputs.version }}
 
