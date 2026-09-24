@@ -1,20 +1,46 @@
 name: python-deployment
 
-run-name: ${{ github.actor }} - ${{ github.ref_name}} -${{ github.sha }}
+run-name: ${{ github.actor }} - ${{ github.ref_name }} - ${{ github.sha }}
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      matrix_artifact:
+        description: "Choose which artifact from the matrix to deploy"
+        required: true
+        default: "ubuntu-3.8"
+        type: choice
+        options:
+          - "ubuntu-3.8"
+          - "ubuntu-3.9"
+          - "windows-3.8"
+          - "windows-3.9"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PythonVersion: 3.8
-  DockerImageName: todoapp
+  DockerImageName: somewellich/todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu, windows]
+        python_version: ['3.8', '3.9']
+        include:
+          - os: ubuntu
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +48,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
+      - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Install dependencies
         run: |
@@ -53,18 +79,18 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: ${{ matrix.os }}-${{ matrix.python_version }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu' && matrix.python_version == '3.8'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu' && matrix.python_version == '3.8'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -76,72 +102,170 @@ jobs:
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
     steps:
+      - uses: actions/download-artifact@v4
+        name: Download python artifacts
+        with:
+          name: ${{ inputs.matrix_artifact || 'ubuntu-3.8' }}
+          path: .
 
-    - uses: actions/download-artifact@v4
-      name: Download python artifacts
-      with:
-        name: python-artifacts
-        path: .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        push: true
-        context: ./src
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: ./src
+          tags: ${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
     runs-on: ubuntu-latest
     needs: python-ci
-    if: github.ref_name == 'main'
+    if: ${{ github.ref_name == 'main' }}
     name: Helm CI
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: helm-artifacts
-        path: .
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
 
-    - name: Set Up Helm
-      uses: azure/setup-helm@v4.2.0
+      - name: Lint helm
+        run: helm lint ./todoapp/
 
-    - name: Lint helm
-      run: helm lint ./todoapp/
+      - name: Template Helm
+        run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
 
-    - name: Template Helm
-      run: helm template todoapp ./todoapp/ -f ./todoapp/values.yaml
+      - name: Package Helm
+        run: helm package ./todoapp
 
-    - name: Package Helm
-      run: helm package ./todoapp
-
-    - name: Upload Helm Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: helm-package
-        path: ./*.tgz
+      - name: Upload Helm Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-package
+          path: ./*.tgz
 
   deploy-helm-dev:
     name: Deploy helm to Development
-    uses: ./.github/workflows/reusable-deployment.yml
+    runs-on: ubuntu-latest
+    environment: development
     needs: [helm-ci, docker-ci]
-    secrets: inherit
-    with:
-      environment: development
-      version: ${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-package
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: kind-cluster
+          path: .
+
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          config: ./cluster.yml
+
+      - name: Dry Run Helm
+        run: |
+          helm install --dry-run todoapp ./todoapp-*.tgz \
+          -f ./todoapp/values.yaml \
+          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.tag=${{ github.sha }}
+
+      - name: Deploy helm to Development
+        run: |
+          helm upgrade --install --wait --timeout 180s --debug todoapp ./todoapp-*.tgz \
+          -f ./todoapp/values.yaml \
+          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.tag=${{ github.sha }}
 
   deploy-helm-stg:
     name: Deploy helm to Staging
-    uses: ./.github/workflows/reusable-deployment.yml
+    runs-on: ubuntu-latest
+    environment: staging
     needs: [deploy-helm-dev]
-    secrets: inherit
-    with:
-      environment: staging
-      version: ${{ github.sha }}
-      helm-values-path: ./todoapp/values/stg.yaml
-      helm-release-name: todoapp-staging
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-package
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-artifacts
+          path: .
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: kind-cluster
+          path: .
+
+      - name: Set Up Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          config: ./cluster.yml
+
+      - name: Dry Run Helm
+        run: |
+          helm install --dry-run todoapp-staging ./todoapp-*.tgz \
+          -f ./todoapp/values/stg.yaml \
+          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.tag=${{ github.sha }}
+
+      - name: Deploy helm to Staging
+        run: |
+          helm upgrade --install --wait --timeout 180s --debug todoapp-staging ./todoapp-*.tgz \
+          -f ./todoapp/values/stg.yaml \
+          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
+          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
+          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
+          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
+          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
+          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
+          --set todoapp.image.tag=${{ github.sha }}
