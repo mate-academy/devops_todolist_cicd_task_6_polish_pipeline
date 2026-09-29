@@ -1,80 +1,73 @@
-name: helm-upgrade
-run-name: ${{ github.actor }} - ${{ github.ref_name }}
+name: Reusable Deployment
 
 on:
   workflow_call:
     inputs:
       environment:
         required: true
-        description: 'Environment to deploy to'
         type: string
       version:
         required: true
         type: string
       helm-values-path:
+        required: false
         type: string
-        default: './todoapp/values.yaml'
+        default: ''
       helm-release-name:
-        default: todoapp
+        required: false
         type: string
-jobs:
-    deploy-helm:
-      name: ${{ inputs.environment }}
-      runs-on: ubuntu-latest
-      environment: ${{ inputs.environment }}
+        default: 'todoapp'
 
-      steps:
-      - uses: actions/download-artifact@v4
+env:
+  DockerImageName: ${{ secrets.DOCKERHUB_USERNAME }}/todoapp
+
+jobs:
+  deployment:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.10.0
+
+      - name: Download Helm package artifact
+        uses: actions/download-artifact@v4
         with:
           name: helm-package
-          path: .
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: helm-artifacts
-          path: .
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: kind-cluster
-          path: .
 
       - name: Set Up Helm
         uses: azure/setup-helm@v4.2.0
 
-      - name: Set up Kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          config: ./cluster.yml
-
-      - name: Dry Run Helm
+      - name: Deploy helm
         run: |
-          helm install --dry-run ${{ inputs.helm-release-name }} ./todoapp-*.tgz  \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          VALUES_FLAG=""
+          VAL_PATH="${{ inputs.helm-values-path }}"
+          if [ -n "$VAL_PATH" ]; then
+            if [ -f "$VAL_PATH" ]; then
+              VALUES_FLAG="-f $VAL_PATH"
+            elif [ -f "helm-charts/$VAL_PATH" ]; then
+              VALUES_FLAG="-f helm-charts/$VAL_PATH"
+            elif [ -f "${VAL_PATH#./}" ]; then
+              VALUES_FLAG="-f ${VAL_PATH#./}"
+            elif [ -f "helm-charts/${VAL_PATH#./}" ]; then
+              VALUES_FLAG="-f helm-charts/${VAL_PATH#./}"
+            fi
+          fi
 
-      - name: Deploy helm to Development
+          helm upgrade --install --wait --timeout 500s --debug \
+            ${{ inputs.helm-release-name }} ./todoapp-*.tgz $VALUES_FLAG \
+            --set image.repository=${{ env.DockerImageName }} \
+            --set image.tag=${{ inputs.version }}
+
+      - name: Debug Kubernetes Pods on Failure
+        if: failure()
         run: |
-          helm upgrade --install --wait --timeout 180s --debug ${{ inputs.helm-release-name }} ./todoapp-*.tgz \
-          -f ${{ inputs.helm-values-path }} \
-          --set mysql.secrets.MYSQL_ROOT_PASSWORD="${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-          --set mysql.secrets.MYSQL_USER="${{ secrets.MYSQL_USER }}" \
-          --set mysql.secrets.MYSQL_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
-          --set todoapp.secrets.DB_NAME="${{ secrets.APP_DB_NAME }}" \
-          --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
-          --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
-          --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
-
+          echo "=== Kube Pods Status ==="
+          kubectl get pods -A
+          echo "=== Describe Pods in todoapp namespace ==="
+          kubectl describe pods -n todoapp || true
+          echo "=== Logs for TodoApp ==="
+          kubectl logs -n todoapp -l app.kubernetes.io/name=todoapp --tail=100 || true
