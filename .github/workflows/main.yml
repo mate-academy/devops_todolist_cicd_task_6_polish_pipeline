@@ -7,14 +7,33 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: 'Matrix artifact to build and deploy (<os>-<python>)'
+        type: choice
+        default: ubuntu-3.8
+        options:
+          - ubuntu-3.8
+          - ubuntu-3.9
+          - windows-3.8
+          - windows-3.9
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  PythonVersion: 3.8
   DockerImageName: todoapp
 
 jobs:
   python-ci:
-    runs-on: ubuntu-latest
+    name: Python CI (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      matrix:
+        os: [ubuntu, windows]
+        python-version: ['3.8', '3.9']
     defaults:
       run:
         working-directory: ./src
@@ -22,10 +41,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PythonVersion }}
-        uses: actions/setup-python@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PythonVersion }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -34,10 +53,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
-        run: |
-          python manage.py test
-
-      - name: Generate Report
         run: |
           coverage run --source='.' manage.py test
           coverage report
@@ -53,18 +68,18 @@ jobs:
       - name: Upload python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-artifacts
+          name: ${{ matrix.os }}-${{ matrix.python-version }}
           path: .
 
       - name: Upload helm artifacts
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu' && matrix.python-version == '3.8'
         uses: actions/upload-artifact@v4
         with:
           name: helm-artifacts
           path: ${{ github.workspace }}/helm-charts
 
       - name: Upload kind cluster artifact
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && matrix.os == 'ubuntu' && matrix.python-version == '3.8'
         uses: actions/upload-artifact@v4
         with:
           name: kind-cluster
@@ -75,13 +90,19 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref_name == 'main' }}
     needs: python-ci
+    env:
+      ARTIFACT: ${{ inputs.artifact || 'ubuntu-3.8' }}
     steps:
 
     - uses: actions/download-artifact@v4
       name: Download python artifacts
       with:
-        name: python-artifacts
+        name: ${{ env.ARTIFACT }}
         path: .
+
+    - name: Get Python version from artifact
+      id: python
+      run: echo "version=${ARTIFACT##*-}" >> "$GITHUB_OUTPUT"
 
     - name: Login to Docker Hub
       uses: docker/login-action@v3
@@ -94,6 +115,7 @@ jobs:
       with:
         push: true
         context: ./src
+        build-args: PYTHON_VERSION=${{ steps.python.outputs.version }}
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
