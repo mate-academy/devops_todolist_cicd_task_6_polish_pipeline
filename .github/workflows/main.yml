@@ -27,7 +27,7 @@ concurrency:
 
 env:
   PythonVersion: 3.8
-  DockerImageName: kapany322/todoapp
+  DockerImageName: todoapp
 
 jobs:
   python-ci:
@@ -164,6 +164,7 @@ jobs:
     secrets: inherit
     with:
       environment: staging
+      required_reviewers: true
       version: ${{ github.sha }}
       helm-values-path: ./todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
