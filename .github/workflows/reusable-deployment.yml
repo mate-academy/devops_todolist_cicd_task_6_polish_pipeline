@@ -13,7 +13,7 @@ on:
         type: string
       helm-values-path:
         type: string
-        default: './todoapp/values.yaml'
+        default: './helm-charts/todoapp/values.yaml'
       helm-release-name:
         default: todoapp
         type: string
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: helm-artifacts
-          path: .
+          path: ./helm-charts
 
       - uses: actions/download-artifact@v4
         with:
@@ -62,7 +62,8 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
+          --set todoapp.image.tag="${{ inputs.version }}"
 
       - name: Deploy helm to Development
         run: |
@@ -76,5 +77,6 @@ jobs:
           --set todoapp.secrets.DB_USER="${{ secrets.MYSQL_USER }}" \
           --set todoapp.secrets.DB_PASSWORD="${{ secrets.MYSQL_PASSWORD }}" \
           --set todoapp.secrets.DB_HOST="${{ secrets.APP_DB_HOST }}" \
-          --set todoapp.image.tag=${{ github.sha }}
+          --set todoapp.image.repository="${{ secrets.DOCKERHUB_USERNAME }}/todoapp" \
+          --set todoapp.image.tag="${{ inputs.version }}"
 

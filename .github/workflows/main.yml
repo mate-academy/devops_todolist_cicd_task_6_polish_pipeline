@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  DockerImageName: todoapp
+  DockerImageName: aleksandrmajlo/todoapp
 
 jobs:
   python-tests:
@@ -142,7 +142,7 @@ jobs:
           context: ./src
           file: ./src/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DockerImageName }}:${{ github.sha }}
+          tags: ${{ env.DockerImageName }}:${{ github.sha }}
 
   helm-ci:
     name: Helm CI
@@ -209,5 +209,5 @@ jobs:
     with:
       environment: staging
       version: ${{ github.sha }}
-      helm-values-path: ./todoapp/values/stg.yaml
+      helm-values-path: ./helm-charts/todoapp/values/stg.yaml
       helm-release-name: todoapp-staging
