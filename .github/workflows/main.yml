@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  DockerImageName: aleksandrmajlo/todoapp
+  DockerImageName: ${{ secrets.DOCKERHUB_USERNAME }}/todoapp
 
 jobs:
   python-tests:
